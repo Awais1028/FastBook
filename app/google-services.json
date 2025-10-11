@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "247749560347",
+    "project_id": "fastbook-17c70",
+    "storage_bucket": "fastbook-17c70.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:247749560347:android:d9ca9c15408ca5f40a90be",
+        "android_client_info": {
+          "package_name": "com.example.myapplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDykRhQXAhwNMqKrGXFJFhWrqHNnc9xDdY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
