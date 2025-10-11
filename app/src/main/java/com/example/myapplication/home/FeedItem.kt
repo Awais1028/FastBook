@@ -1,38 +1,58 @@
-import android.R
+package com.example.myapplication.home
+
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
-// FeedItem.kt (already)
+// Note: SimpleDateFormat, Date, and Locale imports are no longer needed here.
+
+/**
+ * ## Updated FeedItem Data Class
+ * The `timestamp` is now a Long for proper sorting.
+ */
 data class FeedItem(
+    val postId: String = "",
+    val publisher: String = "", // The user's unique ID (uid)
     val userName: String = "",
-    val timeStamp: String = "",
     val postText: String = "",
     val postImageUrl: String? = null,
-    val postVideoUrl: String? = null
+    val postVideoUrl: String? = null,
+    val timestamp: Long = 0L // The correct data type for time
 )
 
-// In your activity/fragment where you create posts:
-val postsRef = FirebaseDatabase.getInstance().getReference("posts")
-
+/**
+ * ## Updated createPost Function
+ * This function now saves the current time as a Long using System.currentTimeMillis()
+ * and populates all the fields of the FeedItem.
+ */
 fun createPost(text: String, imageUrl: String? = null, videoUrl: String? = null) {
-    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: "anonymous"
-    val userName = FirebaseAuth.getInstance().currentUser?.displayName
-        ?: FirebaseAuth.getInstance().currentUser?.email?.substringBefore("@") ?: "User"
-    val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-    val formattedTimestamp = dateFormat.format(Date())
+    // 1. Get current user's info
+    val firebaseUser = FirebaseAuth.getInstance().currentUser ?: return
+    val publisherId = firebaseUser.uid
+    val userName = firebaseUser.displayName ?: "User"
+
+    // 2. Get a reference to the "posts" node in Firebase
+    val postsRef = FirebaseDatabase.getInstance().getReference("posts")
+
+    // 3. Generate a unique ID for the new post
+    val postId = postsRef.push().key ?: return
+
+    // 4. Create the post object with all the correct data
     val post = FeedItem(
+        postId = postId,
+        publisher = publisherId,
         userName = userName,
-        timeStamp = formattedTimestamp,  // <-- LONG timestamp
         postText = text,
         postImageUrl = imageUrl,
-        postVideoUrl = videoUrl
+        postVideoUrl = videoUrl,
+        timestamp = System.currentTimeMillis() // Saves the current time as a Long
     )
 
-    val key = postsRef.push().key ?: return
-    postsRef.child(key).setValue(post)
-        .addOnSuccessListener { /* notify user */ }
-        .addOnFailureListener { e -> /* handle error */ }
+    // 5. Save the complete post object to the database
+    postsRef.child(postId).setValue(post)
+        .addOnSuccessListener {
+            // Post was successful
+        }
+        .addOnFailureListener { e ->
+            // Handle the error
+        }
 }

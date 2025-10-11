@@ -8,10 +8,10 @@ import androidx.appcompat.widget.Toolbar
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import com.example.myapplication.post.NewPostFragment
 import com.example.myapplication.notifications.NotificationFragment
 import com.example.myapplication.profile.ProfileFragment
 import com.example.myapplication.R
+import com.example.myapplication.post.NewPostFragment
 import com.google.android.material.bottomnavigation.BottomNavigationView
 
 class FeedActivity : AppCompatActivity() {

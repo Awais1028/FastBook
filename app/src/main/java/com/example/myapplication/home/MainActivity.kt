@@ -9,7 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.myapplication.auth.SignInScreen
 import com.google.firebase.FirebaseApp
-// In your MainActivity.kt or Application class
 import com.cloudinary.android.MediaManager
 import java.util.HashMap
 
