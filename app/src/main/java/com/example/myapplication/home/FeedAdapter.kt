@@ -1,6 +1,6 @@
-package com.example.myapplication.home
-// (Assuming your FeedAdapter is in the Adapter package based on your project structure)
+package com.example.myapplication.home // Correct package name
 
+import com.example.myapplication.home.FeedItem // Correct path to your FeedItem model
 import android.content.Intent
 import android.net.Uri
 import android.view.LayoutInflater
@@ -17,20 +17,17 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import androidx.core.net.toUri
 
 class FeedAdapter(private val feedList: MutableList<FeedItem>) :
     RecyclerView.Adapter<FeedAdapter.FeedViewHolder>() {
-// In FeedAdapter.kt
 
     inner class FeedViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        // Find all the views from your new layout
         val userNameText: TextView = itemView.findViewById(R.id.textUserName)
         val timeStampText: TextView = itemView.findViewById(R.id.textTimestamp)
         val postText: TextView = itemView.findViewById(R.id.textPost)
         val postImage: ImageView = itemView.findViewById(R.id.imagePost)
         val postVideo: VideoView = itemView.findViewById(R.id.videoPost)
-
-        // Add references for your new like/comment icons
         val likeIcon: ImageView = itemView.findViewById(R.id.iconLike)
         val commentIcon: ImageView = itemView.findViewById(R.id.iconComment)
     }
@@ -40,7 +37,6 @@ class FeedAdapter(private val feedList: MutableList<FeedItem>) :
         return FeedViewHolder(view)
     }
 
-    // --- UPDATED: Format Long timestamp to "time ago" ---
     private fun formatTimeAgo(timestamp: Long): String {
         val now = System.currentTimeMillis()
         val diff = now - timestamp
@@ -51,7 +47,6 @@ class FeedAdapter(private val feedList: MutableList<FeedItem>) :
             diff < TimeUnit.DAYS.toMillis(1) -> "${TimeUnit.MILLISECONDS.toHours(diff)} h ago"
             diff < TimeUnit.DAYS.toMillis(7) -> "${TimeUnit.MILLISECONDS.toDays(diff)} d ago"
             else -> {
-                // If older than a week, show actual date
                 val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
                 dateFormat.format(Date(timestamp))
             }
@@ -61,82 +56,101 @@ class FeedAdapter(private val feedList: MutableList<FeedItem>) :
     override fun onBindViewHolder(holder: FeedViewHolder, position: Int) {
         val item = feedList[position]
 
+        // Set the text content for the post
         holder.userNameText.text = item.userName
-        // --- UPDATED: Call with Long timestamp ---
         holder.timeStampText.text = formatTimeAgo(item.timestamp)
         holder.postText.text = item.postText
 
-        // Reset click listeners to avoid recycled callbacks
+        // --- Reset views and listeners for proper RecyclerView recycling ---
         holder.postImage.setOnClickListener(null)
         holder.postVideo.setOnPreparedListener(null)
-        holder.postText.setOnClickListener(null) // Reset for text, in case it was set for video link fallback
+        holder.postText.setOnClickListener(null)
+        holder.likeIcon.setOnClickListener(null)
+        holder.commentIcon.setOnClickListener(null)
 
-        // Hide both media views by default to ensure clean state for recycling
+        // Hide both media views by default to ensure a clean state
         holder.postImage.visibility = View.GONE
         holder.postVideo.visibility = View.GONE
 
+        // --- Set up click listeners for like and comment icons ---
         holder.likeIcon.setOnClickListener {
-            // Get the specific post that was clicked
             val clickedPost = feedList[position]
-
-            // TODO: Add logic here to update the like count in Firebase
             Toast.makeText(holder.itemView.context, "Liked post by " + clickedPost.userName, Toast.LENGTH_SHORT).show()
+            // TODO: Add logic here to update the like count in Firebase
         }
 
-        // 1) If there is an explicit image URL -> show it
+        holder.commentIcon.setOnClickListener {
+            val clickedPost = feedList[position]
+            Toast.makeText(holder.itemView.context, "Comment on post by " + clickedPost.userName, Toast.LENGTH_SHORT).show()
+            // TODO: Add logic here for comments
+        }
+
+        // --- Media Display Logic ---
+
+        // 1) Handle Image Posts
         if (!item.postImageUrl.isNullOrEmpty()) {
             holder.postImage.visibility = View.VISIBLE
             Glide.with(holder.itemView.context)
                 .load(item.postImageUrl)
-                .centerCrop()
+                .fitCenter() // Correctly scales images without stretching
                 .into(holder.postImage)
-            return // Stop here, we found media
         }
 
-        // 2) If there is a video URL
-        if (!item.postVideoUrl.isNullOrEmpty()) {
+        // 2) Handle Video Posts
+        else if (!item.postVideoUrl.isNullOrEmpty()) {
             val videoUrl = item.postVideoUrl
 
-            // If it's a YouTube link → show YouTube thumbnail in postImage and open external player on click
+            // Handle YouTube links by showing a thumbnail
             if (videoUrl.contains("youtube.com") || videoUrl.contains("youtu.be")) {
                 val videoId = extractYoutubeId(videoUrl)
                 val thumbUrl = if (videoId != null) "https://img.youtube.com/vi/$videoId/hqdefault.jpg" else null
 
                 if (!thumbUrl.isNullOrEmpty()) {
-                    holder.postImage.visibility = View.VISIBLE // Use image view for thumbnail
-                    Glide.with(holder.itemView.context).load(thumbUrl).centerCrop().into(holder.postImage)
+                    holder.postImage.visibility = View.VISIBLE // Use the ImageView for the thumbnail
+                    Glide.with(holder.itemView.context)
+                        .load(thumbUrl)
+                        .fitCenter()
+                        .into(holder.postImage)
 
                     holder.postImage.setOnClickListener {
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(videoUrl))
                         holder.itemView.context.startActivity(intent)
                     }
-                    return // Stop here, we found media
                 }
             }
+            // Handle direct video links by playing them in the VideoView
+            else {
+                holder.postVideo.visibility = View.VISIBLE
+                try {
+                    holder.postVideo.setVideoURI(Uri.parse(videoUrl))
+                    holder.postVideo.setOnPreparedListener { mp ->
 
-            // For direct video links (http(s) mp4) or android.resource URI -> play inside VideoView
-            holder.postVideo.visibility = View.VISIBLE // Use video view for direct video
+                        // --- THE FIX: RESIZE LOGIC ---
+                        val videoWidth = mp.videoWidth
+                        val videoHeight = mp.videoHeight
+                        if (videoWidth > 0 && videoHeight > 0) {
+                            val videoAspectRatio = videoWidth.toFloat() / videoHeight.toFloat()
 
-            try {
-                holder.postVideo.setVideoURI(Uri.parse(videoUrl))
-                holder.postVideo.setOnPreparedListener { mp ->
-                    mp.isLooping = true
-                    holder.postVideo.start()
-                }
-            } catch (e: Exception) {
-                // fallback: hide video view and show link as clickable text
-                holder.postVideo.visibility = View.GONE
-                holder.postText.append("\n\n▶ Video: $videoUrl") // Append to existing text
-                holder.postText.setOnClickListener {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(videoUrl))
-                    holder.itemView.context.startActivity(intent)
+                            // Use the width of the entire item view for a reliable calculation
+                            val viewWidth = holder.itemView.width // ✅ This is the fix
+
+                            if (viewWidth > 0) {
+                                val newHeight = (viewWidth / videoAspectRatio).toInt()
+                                holder.postVideo.layoutParams.height = newHeight
+                                holder.postVideo.requestLayout() // Apply the new height
+                            }
+                        }
+                        mp.isLooping = true
+                        holder.postVideo.start()
+                    }
+                } catch (e: Exception) {
+                    // Fallback if the video URL is invalid
+                    holder.postVideo.visibility = View.GONE
+                    holder.postText.append("\n\n▶ Invalid Video Link: $videoUrl")
                 }
             }
-            return // Stop here, we found media
         }
-
-        // 3) No media -> both are already GONE due to initial reset or previous logic.
-        // No explicit action needed here for text-only, as the textPost will always be visible.
+        // 3) Text-only posts are handled implicitly, as both media views remain hidden.
     }
 
     override fun getItemCount(): Int = feedList.size

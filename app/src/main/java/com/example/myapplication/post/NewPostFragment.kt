@@ -135,33 +135,53 @@ class NewPostFragment : Fragment() {
     }
 
     // Universal save function for all post types
+    // In NewPostFragment.kt, replace the entire function with this updated version
+
     private fun savePostToFirebase(postText: String, imageUrl: String?, videoUrl: String?) {
         val firebaseUser = FirebaseAuth.getInstance().currentUser ?: return
-        val postsRef = FirebaseDatabase.getInstance().reference.child("posts") // Correct lowercase "posts" path
-        val postId = postsRef.push().key ?: return
+        val currentUserId = firebaseUser.uid
 
-        val post = FeedItem(
-            postId = postId,
-            publisher = firebaseUser.uid,
-            userName = firebaseUser.displayName ?: "User",
-            postText = postText,
-            postImageUrl = imageUrl,
-            postVideoUrl = videoUrl,
-            timestamp = System.currentTimeMillis()
-        )
+        // 1. Get a reference to the current user's data in the "Users" node
+        val userRef = FirebaseDatabase.getInstance().getReference("Users").child(currentUserId)
 
-        postsRef.child(postId).setValue(post).addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                Toast.makeText(requireContext(), "Post published successfully!", Toast.LENGTH_SHORT).show()
-                // Clear fields and reset UI
-                postEditText.text.clear()
-                videoPreview.visibility = View.GONE
-                imagePreview.visibility = View.GONE
-                videoUri = null
-                imageUri = null
-            } else {
-                Toast.makeText(requireContext(), "Failed to publish post.", Toast.LENGTH_SHORT).show()
+        // 2. Fetch the user's data ONE time to get their name
+        userRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                // Get the fullName we saved during sign-up
+                val userName = snapshot.child("fullName").getValue(String::class.java) ?: "User"
+
+                // 3. Now that we have the name, proceed with creating and saving the post
+                val postsRef = FirebaseDatabase.getInstance().reference.child("posts")
+                val postId = postsRef.push().key ?: return
+
+                val post = FeedItem(
+                    postId = postId,
+                    publisher = currentUserId,
+                    userName = userName, // Use the name we fetched from the database
+                    postText = postText,
+                    postImageUrl = imageUrl,
+                    postVideoUrl = videoUrl,
+                    timestamp = System.currentTimeMillis()
+                )
+
+                postsRef.child(postId).setValue(post).addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        Toast.makeText(requireContext(), "Post published successfully!", Toast.LENGTH_SHORT).show()
+                        // Clear fields and reset UI
+                        postEditText.text.clear()
+                        videoPreview.visibility = View.GONE
+                        imagePreview.visibility = View.GONE
+                        videoUri = null
+                        imageUri = null
+                    } else {
+                        Toast.makeText(requireContext(), "Failed to publish post.", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
-        }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Toast.makeText(requireContext(), "Could not fetch user data.", Toast.LENGTH_SHORT).show()
+            }
+        })
     }
 }

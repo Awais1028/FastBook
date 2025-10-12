@@ -8,6 +8,11 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.example.myapplication.R
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 
 class ProfileFragment : Fragment(R.layout.fragment_profile) {
 
@@ -27,17 +32,45 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         email = view.findViewById(R.id.editEmail)
         saveButton = view.findViewById(R.id.saveButton)
 
-        // Set some dummy data
-        firstName.text = "John"
-        lastName.text = "Doe"
-        email.text = "john.doe@example.com"
+        // --- NEW: Load user data from Firebase ---
+        loadUserInfo()
 
-        // Example: Set the profile image from a drawable (You can load an image dynamically)
-        profileImage.setImageResource(R.drawable.ic_profile)
-
-        // Handle save button click
+        // You can add logic here for what happens when the user saves changes
         saveButton.setOnClickListener {
-            Toast.makeText(requireContext(), "Changes saved successfully!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), "Save functionality not implemented yet.", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun loadUserInfo() {
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+        if (currentUserId == null) {
+            Toast.makeText(requireContext(), "User not logged in.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val userRef = FirebaseDatabase.getInstance().getReference("Users").child(currentUserId)
+
+        userRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) {
+                    val userFullName = snapshot.child("fullName").getValue(String::class.java)
+                    val userEmail = snapshot.child("email").getValue(String::class.java)
+
+                    // Set the retrieved data to the TextViews
+                    email.text = userEmail
+
+                    // Split the full name into first and last names
+                    val names = userFullName?.split(" ")
+                    if (names != null && names.isNotEmpty()) {
+                        firstName.text = names[0]
+                        lastName.text = if (names.size > 1) names.last() else ""
+                    }
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Toast.makeText(requireContext(), "Failed to load user data.", Toast.LENGTH_SHORT).show()
+            }
+        })
     }
 }
