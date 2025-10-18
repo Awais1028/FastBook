@@ -1,6 +1,8 @@
 package com.example.myapplication.post // Correct package name
 
 import android.app.ProgressDialog
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -15,9 +17,13 @@ import com.cloudinary.android.callback.UploadCallback
 import com.example.myapplication.R // Correct R file import
 import com.example.myapplication.home.FeedItem // Correct path to your FeedItem model
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageReference
+import android.util.Log // Added for debugging
 
 class NewPostFragment : Fragment() {
 
@@ -30,12 +36,15 @@ class NewPostFragment : Fragment() {
 
     private var videoUri: Uri? = null
     private var imageUri: Uri? = null
+    private var mediaWidth: Int = 0
+    private var mediaHeight: Int = 0
 
-    // Launcher for picking a video
     private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             videoUri = uri
             imageUri = null // Ensure only one media type is selected
+            getImageDimensions(Uri.EMPTY) // Clear image dimensions
+            getVideoDimensions(uri) // Get video dimensions
             videoPreview.setVideoURI(videoUri)
             videoPreview.visibility = View.VISIBLE
             imagePreview.visibility = View.GONE
@@ -43,11 +52,12 @@ class NewPostFragment : Fragment() {
         }
     }
 
-    // Launcher for picking an image
     private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             imageUri = uri
             videoUri = null // Ensure only one media type is selected
+            getVideoDimensions(Uri.EMPTY) // Clear video dimensions
+            getImageDimensions(uri) // Get image dimensions
             imagePreview.setImageURI(imageUri)
             imagePreview.visibility = View.VISIBLE
             videoPreview.visibility = View.GONE
@@ -78,90 +88,124 @@ class NewPostFragment : Fragment() {
             when {
                 videoUri != null -> uploadVideoToCloudinary(content)
                 imageUri != null -> uploadImageToFirebaseStorage(content)
-                else -> savePostToFirebase(content, null, null) // Text-only post
+                else -> savePostToFirebase(content, null, null, 0, 0) // Text-only post
             }
         }
         return view
     }
 
-    // Fully implemented video upload
+    private fun getImageDimensions(uri: Uri) {
+        if (uri == Uri.EMPTY) {
+            mediaWidth = 0
+            mediaHeight = 0
+            return
+        }
+        try {
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            requireActivity().contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, options)
+            }
+            mediaWidth = options.outWidth
+            mediaHeight = options.outHeight
+            Log.d("NewPostFragment", "Image dimensions: $mediaWidth x $mediaHeight")
+        } catch (e: Exception) {
+            Log.e("NewPostFragment", "Error getting image dimensions: ${e.message}", e)
+            mediaWidth = 0
+            mediaHeight = 0
+        }
+    }
+
+    private fun getVideoDimensions(uri: Uri) {
+        if (uri == Uri.EMPTY) {
+            mediaWidth = 0
+            mediaHeight = 0
+            return
+        }
+        try {
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(requireContext(), uri)
+            mediaWidth = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            mediaHeight = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+            retriever.release()
+            Log.d("NewPostFragment", "Video dimensions: $mediaWidth x $mediaHeight")
+        } catch (e: Exception) {
+            Log.e("NewPostFragment", "Error getting video dimensions: ${e.message}", e)
+            mediaWidth = 0
+            mediaHeight = 0
+        }
+    }
+
     private fun uploadVideoToCloudinary(postText: String) {
-        val progressDialog = ProgressDialog(requireContext())
-        progressDialog.setMessage("Uploading video...")
-        progressDialog.setCancelable(false)
-        progressDialog.show()
+        val progressDialog = ProgressDialog(requireContext()).apply {
+            setMessage("Uploading video...")
+            setCancelable(false)
+            show()
+        }
 
         MediaManager.get().upload(videoUri).option("resource_type", "video")
             .callback(object : UploadCallback {
                 override fun onSuccess(requestId: String, resultData: Map<*, *>?) {
                     progressDialog.dismiss()
                     val videoUrl = resultData?.get("secure_url") as String
-                    savePostToFirebase(postText, null, videoUrl)
+                    savePostToFirebase(postText, null, videoUrl, mediaWidth, mediaHeight)
                 }
 
                 override fun onError(requestId: String, error: ErrorInfo) {
                     progressDialog.dismiss()
                     Toast.makeText(requireContext(), "Video upload failed: ${error.description}", Toast.LENGTH_SHORT).show()
                 }
-
-                override fun onStart(requestId: String) {}
-                override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) {}
-                override fun onReschedule(requestId: String, error: ErrorInfo) {}
+                override fun onStart(requestId: String) { Log.d("NewPostFragment", "Cloudinary upload started: $requestId") }
+                override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) { Log.d("NewPostFragment", "Cloudinary progress: $bytes / $totalBytes") }
+                override fun onReschedule(requestId: String, error: ErrorInfo) { Log.d("NewPostFragment", "Cloudinary reschedule: $requestId - ${error.description}") }
             }).dispatch()
     }
 
-    // Function to upload the image
     private fun uploadImageToFirebaseStorage(postText: String) {
-        val progressDialog = ProgressDialog(requireContext())
-        progressDialog.setMessage("Publishing post...")
-        progressDialog.setCancelable(false)
-        progressDialog.show()
+        val progressDialog = ProgressDialog(requireContext()).apply {
+            setMessage("Publishing post...")
+            setCancelable(false)
+            show()
+        }
 
         val storageRef: StorageReference = FirebaseStorage.getInstance().reference.child("Post Pictures")
-        val fileRef = storageRef.child(System.currentTimeMillis().toString() + ".jpg")
+        val fileRef = storageRef.child("${System.currentTimeMillis()}.jpg")
 
         fileRef.putFile(imageUri!!)
             .addOnSuccessListener { taskSnapshot ->
                 taskSnapshot.storage.downloadUrl.addOnSuccessListener { uri ->
-                    val imageUrl = uri.toString()
-                    savePostToFirebase(postText, imageUrl, null)
                     progressDialog.dismiss()
+                    val imageUrl = uri.toString()
+                    savePostToFirebase(postText, imageUrl, null, mediaWidth, mediaHeight)
                 }
             }
             .addOnFailureListener { e ->
-                Toast.makeText(requireContext(), "Image upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
                 progressDialog.dismiss()
+                Toast.makeText(requireContext(), "Image upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                Log.e("NewPostFragment", "Firebase image upload failed", e)
             }
     }
 
-    // Universal save function for all post types
-    // In NewPostFragment.kt, replace the entire function with this updated version
-
-    private fun savePostToFirebase(postText: String, imageUrl: String?, videoUrl: String?) {
+    private fun savePostToFirebase(postText: String, imageUrl: String?, videoUrl: String?, width: Int, height: Int) {
         val firebaseUser = FirebaseAuth.getInstance().currentUser ?: return
         val currentUserId = firebaseUser.uid
-
-        // 1. Get a reference to the current user's data in the "Users" node
         val userRef = FirebaseDatabase.getInstance().getReference("Users").child(currentUserId)
 
-        // 2. Fetch the user's data ONE time to get their name
-        userRef.addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
-            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                // Get the fullName we saved during sign-up
+        userRef.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
                 val userName = snapshot.child("fullName").getValue(String::class.java) ?: "User"
-
-                // 3. Now that we have the name, proceed with creating and saving the post
-                val postsRef = FirebaseDatabase.getInstance().reference.child("posts")
+                val postsRef = FirebaseDatabase.getInstance().getReference("posts") // Correct lowercase "posts" path
                 val postId = postsRef.push().key ?: return
 
                 val post = FeedItem(
                     postId = postId,
                     publisher = currentUserId,
-                    userName = userName, // Use the name we fetched from the database
+                    userName = userName,
                     postText = postText,
                     postImageUrl = imageUrl,
                     postVideoUrl = videoUrl,
-                    timestamp = System.currentTimeMillis()
+                    timestamp = System.currentTimeMillis(),
+                    mediaWidth = width,
+                    mediaHeight = height
                 )
 
                 postsRef.child(postId).setValue(post).addOnCompleteListener { task ->
@@ -173,14 +217,17 @@ class NewPostFragment : Fragment() {
                         imagePreview.visibility = View.GONE
                         videoUri = null
                         imageUri = null
+                        mediaWidth = 0
+                        mediaHeight = 0
                     } else {
                         Toast.makeText(requireContext(), "Failed to publish post.", Toast.LENGTH_SHORT).show()
+                        Log.e("NewPostFragment", "Failed to save post to Firebase", task.exception)
                     }
                 }
             }
-
-            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
-                Toast.makeText(requireContext(), "Could not fetch user data.", Toast.LENGTH_SHORT).show()
+            override fun onCancelled(error: DatabaseError) {
+                Toast.makeText(requireContext(), "Could not fetch user data for post.", Toast.LENGTH_SHORT).show()
+                Log.e("NewPostFragment", "Firebase user data fetch cancelled: ${error.message}")
             }
         })
     }

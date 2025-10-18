@@ -1,6 +1,5 @@
 package com.example.myapplication.home // Correct package name
 
-import com.example.myapplication.home.FeedItem // Correct path to your FeedItem model
 import android.content.Intent
 import android.net.Uri
 import android.view.LayoutInflater
@@ -18,8 +17,17 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import androidx.core.net.toUri
+import android.graphics.drawable.Drawable
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.request.target.Target
+import android.util.Log // Added for debugging, can be removed later
+import com.bumptech.glide.load.engine.GlideException
 
-class FeedAdapter(private val feedList: MutableList<FeedItem>) :
+class FeedAdapter(
+    private val feedList: MutableList<FeedItem>,
+    private val parentWidth: Int
+) :
     RecyclerView.Adapter<FeedAdapter.FeedViewHolder>() {
 
     inner class FeedViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -65,8 +73,8 @@ class FeedAdapter(private val feedList: MutableList<FeedItem>) :
         holder.postImage.setOnClickListener(null)
         holder.postVideo.setOnPreparedListener(null)
         holder.postText.setOnClickListener(null)
-        holder.likeIcon.setOnClickListener(null)
-        holder.commentIcon.setOnClickListener(null)
+        holder.likeIcon.setOnClickListener(null) // Reset like listener
+        holder.commentIcon.setOnClickListener(null) // Reset comment listener
 
         // Hide both media views by default to ensure a clean state
         holder.postImage.visibility = View.GONE
@@ -85,31 +93,75 @@ class FeedAdapter(private val feedList: MutableList<FeedItem>) :
             // TODO: Add logic here for comments
         }
 
+        // --- NEW: Pre-size the media view if dimensions are available ---
+        // This calculates the necessary height based on stored dimensions and item width
+        // Pre-size the media view using the dimensions from Firebase
+        if (item.mediaWidth > 0 && item.mediaHeight > 0) {
+            val viewToResize: View = if (!item.postImageUrl.isNullOrEmpty()) holder.postImage else holder.postVideo
+            val aspectRatio = item.mediaWidth.toFloat() / item.mediaHeight.toFloat()
+
+            // Use the reliable parentWidth for the calculation, eliminating the need for an else block
+            val newHeight = (parentWidth / aspectRatio).toInt()
+            viewToResize.layoutParams.height = newHeight
+            viewToResize.requestLayout()
+        } else {
+            // Fallback for old posts without dimensions or text-only posts: use wrap_content for image, hide video
+            holder.postImage.layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT
+            holder.postImage.requestLayout()
+            holder.postVideo.layoutParams.height = 0 // Ensure video is effectively hidden if no dimensions
+            holder.postVideo.requestLayout()
+        }
+
+
         // --- Media Display Logic ---
 
         // 1) Handle Image Posts
         if (!item.postImageUrl.isNullOrEmpty()) {
             holder.postImage.visibility = View.VISIBLE
+            // TODO: Start shimmer effect here (e.g., holder.shimmerContainer.startShimmer())
             Glide.with(holder.itemView.context)
                 .load(item.postImageUrl)
                 .fitCenter() // Correctly scales images without stretching
+                .listener(object : RequestListener<Drawable> {
+                    override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>?, isFirstResource: Boolean): Boolean {
+                        // TODO: Stop shimmer effect here
+                        Log.e("FeedAdapter", "Image load failed: ${e?.message}")
+                        return false // Important: return false so Glide still calls the target
+                    }
+                    override fun onResourceReady(resource: Drawable?, model: Any?, target: Target<Drawable>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
+                        // TODO: Stop shimmer effect here (e.g., holder.shimmerContainer.stopShimmer())
+                        return false
+                    }
+                })
                 .into(holder.postImage)
         }
 
         // 2) Handle Video Posts
-        else if (!item.postVideoUrl.isNullOrEmpty()) {
+        else if (!item.postVideoUrl.isNullOrEmpty()) { // Use else if to ensure only one media type is shown
             val videoUrl = item.postVideoUrl
 
-            // Handle YouTube links by showing a thumbnail
+            // Handle YouTube links by showing a thumbnail in the ImageView
             if (videoUrl.contains("youtube.com") || videoUrl.contains("youtu.be")) {
                 val videoId = extractYoutubeId(videoUrl)
                 val thumbUrl = if (videoId != null) "https://img.youtube.com/vi/$videoId/hqdefault.jpg" else null
 
                 if (!thumbUrl.isNullOrEmpty()) {
                     holder.postImage.visibility = View.VISIBLE // Use the ImageView for the thumbnail
+                    // TODO: Start shimmer effect here
                     Glide.with(holder.itemView.context)
                         .load(thumbUrl)
                         .fitCenter()
+                        .listener(object : RequestListener<Drawable> {
+                            override fun onLoadFailed(e: GlideException?, model: Any?, target: Target<Drawable>?, isFirstResource: Boolean): Boolean {
+                                // TODO: Stop shimmer effect here
+                                Log.e("FeedAdapter", "YouTube thumb load failed: ${e?.message}")
+                                return false
+                            }
+                            override fun onResourceReady(resource: Drawable?, model: Any?, target: Target<Drawable>?, dataSource: DataSource?, isFirstResource: Boolean): Boolean {
+                                // TODO: Stop shimmer effect here
+                                return false
+                            }
+                        })
                         .into(holder.postImage)
 
                     holder.postImage.setOnClickListener {
@@ -121,36 +173,35 @@ class FeedAdapter(private val feedList: MutableList<FeedItem>) :
             // Handle direct video links by playing them in the VideoView
             else {
                 holder.postVideo.visibility = View.VISIBLE
+                // TODO: Start shimmer effect here
                 try {
                     holder.postVideo.setVideoURI(Uri.parse(videoUrl))
                     holder.postVideo.setOnPreparedListener { mp ->
-
-                        // --- THE FIX: RESIZE LOGIC ---
-                        val videoWidth = mp.videoWidth
-                        val videoHeight = mp.videoHeight
-                        if (videoWidth > 0 && videoHeight > 0) {
-                            val videoAspectRatio = videoWidth.toFloat() / videoHeight.toFloat()
-
-                            // Use the width of the entire item view for a reliable calculation
-                            val viewWidth = holder.itemView.width // ✅ This is the fix
-
-                            if (viewWidth > 0) {
-                                val newHeight = (viewWidth / videoAspectRatio).toInt()
-                                holder.postVideo.layoutParams.height = newHeight
-                                holder.postVideo.requestLayout() // Apply the new height
-                            }
-                        }
+                        // The height is already set by the pre-sizing logic above, so no need to resize here.
+                        // We just start playback.
                         mp.isLooping = true
                         holder.postVideo.start()
+                        // TODO: Stop shimmer effect here
                     }
+                    // For VideoView, also handle error and completion for shimmer
+                    holder.postVideo.setOnErrorListener { mp, what, extra ->
+                        // TODO: Stop shimmer effect here
+                        Log.e("FeedAdapter", "Video playback error: what=$what, extra=$extra")
+                        holder.postVideo.visibility = View.GONE
+                        holder.postText.append("\n\n▶ Error playing video: $videoUrl")
+                        true // Indicate that the error was handled
+                    }
+
                 } catch (e: Exception) {
-                    // Fallback if the video URL is invalid
+                    // Fallback if the video URL is invalid or unplayable
+                    Log.e("FeedAdapter", "Direct video setup error: ${e.message}", e)
                     holder.postVideo.visibility = View.GONE
                     holder.postText.append("\n\n▶ Invalid Video Link: $videoUrl")
+                    // TODO: Stop shimmer effect here
                 }
             }
         }
-        // 3) Text-only posts are handled implicitly, as both media views remain hidden.
+        // Text-only posts are handled implicitly; media views remain hidden.
     }
 
     override fun getItemCount(): Int = feedList.size

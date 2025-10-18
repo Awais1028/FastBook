@@ -16,7 +16,9 @@ data class FeedItem(
     val postText: String = "",
     val postImageUrl: String? = null,
     val postVideoUrl: String? = null,
-    val timestamp: Long = 0L // The correct data type for time
+    val timestamp: Long = 0L, // The correct data type for time
+    val mediaWidth: Int = 0,
+    val mediaHeight: Int = 0
 )
 
 /**
@@ -45,6 +47,7 @@ fun createPost(text: String, imageUrl: String? = null, videoUrl: String? = null)
         postImageUrl = imageUrl,
         postVideoUrl = videoUrl,
         timestamp = System.currentTimeMillis() // Saves the current time as a Long
+
     )
 
     // 5. Save the complete post object to the database

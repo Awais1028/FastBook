@@ -48,7 +48,7 @@ android {
 }
 
 dependencies {
-
+    implementation("com.facebook.shimmer:shimmer:0.5.0")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

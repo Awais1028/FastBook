@@ -21,6 +21,7 @@ class FeedFragment : Fragment() {
 
     private val feedList = mutableListOf<FeedItem>()
     private lateinit var adapter: FeedAdapter
+    private lateinit var recyclerView: RecyclerView
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -32,14 +33,20 @@ class FeedFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val recyclerView: RecyclerView = view.findViewById(R.id.feedRecyclerView)
+        recyclerView = view.findViewById(R.id.feedRecyclerView) // Assigns to the class property
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
-        adapter = FeedAdapter(feedList)
-        recyclerView.adapter = adapter
 
-        loadPosts()
+        // We use a post block to ensure the layout has been measured
+        recyclerView.post {
+            val parentWidth = recyclerView.width
+            if (parentWidth > 0) {
+                // Initialize the adapter with the measured width
+                adapter = FeedAdapter(feedList, parentWidth)
+                recyclerView.adapter = adapter
+                loadPosts() // Load posts only after the adapter is set
+            }
+        }
     }
-
     private fun loadPosts() {
         postsRef = FirebaseDatabase.getInstance().getReference("posts") // Initialization happens here
         val postsQuery = postsRef.orderByChild("timestamp")
