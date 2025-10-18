@@ -9,7 +9,6 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.myapplication.R
-
 import com.google.firebase.database.*
 
 class FeedFragment : Fragment() {
@@ -33,10 +32,10 @@ class FeedFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        recyclerView = view.findViewById(R.id.feedRecyclerView) // Assigns to the class property
+        recyclerView = view.findViewById(R.id.feedRecyclerView)
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
 
-        // We use a post block to ensure the layout has been measured
+        // Use a post block to ensure the layout has been measured
         recyclerView.post {
             val parentWidth = recyclerView.width
             if (parentWidth > 0) {
@@ -44,11 +43,14 @@ class FeedFragment : Fragment() {
                 adapter = FeedAdapter(feedList, parentWidth)
                 recyclerView.adapter = adapter
                 loadPosts() // Load posts only after the adapter is set
+            } else {
+                Log.e(TAG, "RecyclerView width is 0. Cannot initialize adapter.")
             }
         }
     }
+
     private fun loadPosts() {
-        postsRef = FirebaseDatabase.getInstance().getReference("posts") // Initialization happens here
+        postsRef = FirebaseDatabase.getInstance().getReference("posts")
         val postsQuery = postsRef.orderByChild("timestamp")
 
         postsListener = object : ValueEventListener {
@@ -59,7 +61,9 @@ class FeedFragment : Fragment() {
                     post?.let { feedList.add(it) }
                 }
                 feedList.reverse()
-                adapter.notifyDataSetChanged()
+                if (::adapter.isInitialized) {
+                    adapter.notifyDataSetChanged()
+                }
             }
 
             override fun onCancelled(error: DatabaseError) {
@@ -69,12 +73,33 @@ class FeedFragment : Fragment() {
         postsQuery.addValueEventListener(postsListener!!)
     }
 
+    // --- NEW: Pause all players when the fragment is not visible ---
+    override fun onPause() {
+        super.onPause()
+        if (::adapter.isInitialized) {
+            adapter.pauseAllPlayers()
+        }
+        Log.d(TAG, "FeedFragment paused.")
+    }
+
+    // --- NEW: Resume all players when the fragment becomes visible again ---
+    override fun onResume() {
+        super.onResume()
+        if (::adapter.isInitialized) {
+            adapter.resumeAllPlayers()
+        }
+        Log.d(TAG, "FeedFragment resumed.")
+    }
+
+    // --- UPDATED: Release all players and listeners when the view is destroyed ---
     override fun onDestroyView() {
         super.onDestroyView()
-        // Add this check to prevent the crash
-        if (this::postsRef.isInitialized && postsListener != null) {
-            postsRef.removeEventListener(postsListener!!)
-
+        if (::adapter.isInitialized) {
+            adapter.releaseAllPlayers()
         }
+        if (::postsRef.isInitialized && postsListener != null) {
+            postsRef.removeEventListener(postsListener!!)
+        }
+        Log.d(TAG, "FeedFragment view destroyed.")
     }
 }

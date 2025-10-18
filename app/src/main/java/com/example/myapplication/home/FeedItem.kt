@@ -26,7 +26,7 @@ data class FeedItem(
  * This function now saves the current time as a Long using System.currentTimeMillis()
  * and populates all the fields of the FeedItem.
  */
-fun createPost(text: String, imageUrl: String? = null, videoUrl: String? = null) {
+fun createPost(text: String, imageUrl: String?, videoUrl: String?, width: Int, height: Int) {
     // 1. Get current user's info
     val firebaseUser = FirebaseAuth.getInstance().currentUser ?: return
     val publisherId = firebaseUser.uid
@@ -38,7 +38,7 @@ fun createPost(text: String, imageUrl: String? = null, videoUrl: String? = null)
     // 3. Generate a unique ID for the new post
     val postId = postsRef.push().key ?: return
 
-    // 4. Create the post object with all the correct data
+    // 4. Create the post object with all the correct data, including dimensions
     val post = FeedItem(
         postId = postId,
         publisher = publisherId,
@@ -46,8 +46,9 @@ fun createPost(text: String, imageUrl: String? = null, videoUrl: String? = null)
         postText = text,
         postImageUrl = imageUrl,
         postVideoUrl = videoUrl,
-        timestamp = System.currentTimeMillis() // Saves the current time as a Long
-
+        timestamp = System.currentTimeMillis(),
+        mediaWidth = width,    // ✅ Now included
+        mediaHeight = height   // ✅ Now included
     )
 
     // 5. Save the complete post object to the database

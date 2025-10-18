@@ -63,6 +63,8 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     testImplementation(libs.junit)
     //--newAddition Start
+    implementation("androidx.media3:media3-exoplayer:1.3.1")
+    implementation("androidx.media3:media3-ui:1.3.1")
     implementation("com.cloudinary:cloudinary-android:2.1.0")
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.github.bumptech.glide:glide:4.15.1")
