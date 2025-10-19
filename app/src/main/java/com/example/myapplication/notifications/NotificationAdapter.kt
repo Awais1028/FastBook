@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.example.myapplication.R
+import com.google.firebase.database.FirebaseDatabase
 
 class NotificationAdapter(
     private val notifications: List<NotificationItem>
@@ -24,8 +25,16 @@ class NotificationAdapter(
 
     override fun onBindViewHolder(holder: NotificationViewHolder, position: Int) {
         val item = notifications[position]
-        holder.titleText.text = item.title
-        holder.messageText.text = item.message
+
+        holder.messageText.text = item.text
+
+        FirebaseDatabase.getInstance().getReference("Users").child(item.actorId).get()
+            .addOnSuccessListener { dataSnapshot ->
+                val username = dataSnapshot.child("fullName").getValue(String::class.java) ?: "Someone"
+                holder.titleText.text = username
+            }.addOnFailureListener {
+                holder.titleText.text = "Notification"
+            }
     }
 
     override fun getItemCount(): Int = notifications.size

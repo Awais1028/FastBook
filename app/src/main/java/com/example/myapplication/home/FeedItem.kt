@@ -18,7 +18,9 @@ data class FeedItem(
     val postVideoUrl: String? = null,
     val timestamp: Long = 0L, // The correct data type for time
     val mediaWidth: Int = 0,
-    val mediaHeight: Int = 0
+    val mediaHeight: Int = 0,
+    val likes: Map<String, Boolean> = emptyMap(),
+    val commentCount: Int = 0
 )
 
 /**
@@ -49,6 +51,7 @@ fun createPost(text: String, imageUrl: String?, videoUrl: String?, width: Int, h
         timestamp = System.currentTimeMillis(),
         mediaWidth = width,    // ✅ Now included
         mediaHeight = height   // ✅ Now included
+
     )
 
     // 5. Save the complete post object to the database
