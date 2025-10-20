@@ -51,16 +51,24 @@ class SignInScreen : AppCompatActivity() {
             auth.signInWithEmailAndPassword(email, password)
                 .addOnCompleteListener(this) { task ->
                     if (task.isSuccessful) {
-                        Toast.makeText(this, "Login successful!", Toast.LENGTH_SHORT).show()
-                        val intent = Intent(this, FeedActivity::class.java)
-                        startActivity(intent)
-                        finish() // so user can’t go back to login
+                        val firebaseUser = auth.currentUser
+                        // ✅ THIS IS THE NEW VERIFICATION CHECK
+                        if (firebaseUser != null ){//&& firebaseUser.isEmailVerified) {
+                            // User is verified, proceed to the main app
+                            Toast.makeText(this, "Login successful!", Toast.LENGTH_SHORT).show()
+                            val intent = Intent(this, FeedActivity::class.java)
+                            startActivity(intent)
+                            finish()
+                        } else {
+                            // User is NOT verified, show an error and sign them out
+                            Toast.makeText(this, "Please verify your email address first.", Toast.LENGTH_LONG).show()
+                            auth.signOut()
+                        }
                     } else {
                         Toast.makeText(this, "Error: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
                     }
                 }
         }
-
         // Go to SignUp
         tvSignUp.setOnClickListener {
             val intent = Intent(this, SignUpScreen::class.java)

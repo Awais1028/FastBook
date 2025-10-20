@@ -9,9 +9,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.example.myapplication.notifications.NotificationFragment
-import com.example.myapplication.profile.ProfileFragment
+import com.example.myapplication.profile.EditProfileFragment
 import com.example.myapplication.R
 import com.example.myapplication.post.NewPostFragment
+import com.example.myapplication.profile.ProfileFragment
 import com.google.android.material.bottomnavigation.BottomNavigationView
 
 class FeedActivity : AppCompatActivity() {
@@ -27,7 +28,7 @@ class FeedActivity : AppCompatActivity() {
         val topBar = findViewById<View>(R.id.topBar)
         supportFragmentManager.addOnBackStackChangedListener {
             val currentFragment = supportFragmentManager.findFragmentById(R.id.container)
-            if (currentFragment is ProfileFragment) {
+            if (currentFragment is EditProfileFragment) {
                 topBar.visibility = View.GONE
             } else {
                 topBar.visibility = View.VISIBLE

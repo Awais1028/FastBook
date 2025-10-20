@@ -26,6 +26,7 @@ import com.bumptech.glide.request.target.Target
 import com.example.myapplication.R
 import com.example.myapplication.comments.CommentFragment
 import com.example.myapplication.notifications.NotificationItem
+import com.example.myapplication.profile.ProfileFragment
 import com.facebook.shimmer.ShimmerFrameLayout
 import com.google.firebase.auth.FirebaseAuth // Needed for like logic
 import com.google.firebase.database.FirebaseDatabase // Needed for like logic
@@ -105,6 +106,27 @@ class FeedAdapter(
         holder.timeStampText.text = formatTimeAgo(item.timestamp)
         holder.postText.text = item.postText
 
+        holder.userNameText.setOnClickListener {
+            val currentPosition = holder.adapterPosition
+            if (currentPosition != RecyclerView.NO_POSITION) {
+                val clickedPost = feedList[currentPosition]
+
+                // Create the ProfileFragment instance
+                val fragment = ProfileFragment()
+
+                // Create a bundle to pass the UID of the post's author
+                val args = Bundle()
+                args.putString("uid", clickedPost.publisher)
+                fragment.arguments = args
+
+                // Perform the fragment transaction to open the profile
+                val activity = holder.itemView.context as AppCompatActivity
+                activity.supportFragmentManager.beginTransaction()
+                    .replace(R.id.container, fragment) // Use your main fragment container ID
+                    .addToBackStack(null) // Allows the user to press back to return to the feed
+                    .commit()
+            }
+        }
         // --- NEW: LIKE SYSTEM LOGIC ---
         // 1. Set Like Count and Icon State
         holder.likeCountText.text = "${item.likes.size} likes"

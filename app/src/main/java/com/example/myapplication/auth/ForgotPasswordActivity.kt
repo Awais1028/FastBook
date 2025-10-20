@@ -1,39 +1,46 @@
 package com.example.myapplication.auth
 
-import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
-import androidx.activity.enableEdgeToEdge
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import com.example.myapplication.R
+import com.google.firebase.auth.FirebaseAuth // Import FirebaseAuth
 
 class ForgotPasswordActivity : AppCompatActivity() {
+
+    private lateinit var auth: FirebaseAuth
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContentView(R.layout.activity_forgot_password)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.forgotpassactivityid)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
+        // Note: Your edge-to-edge code can remain here if you wish.
+
+        auth = FirebaseAuth.getInstance()
+
         val btnSendVerification = findViewById<Button>(R.id.btnSendVerification)
         val etForgotEmail = findViewById<EditText>(R.id.etForgotEmail)
 
         btnSendVerification.setOnClickListener {
-            val email = etForgotEmail.text.toString()
+            val email = etForgotEmail.text.toString().trim()
 
-            if (email.isNotEmpty()) {
-                // Assuming you send a verification code to the email here
-                // After sending, navigate to the verification code screen
-                val intent = Intent(this, EnterVerificationCodeActivity::class.java)
-                intent.putExtra("email", email) // Pass email to next screen
-                startActivity(intent)
-                finish()
+            if (email.isEmpty()) {
+                Toast.makeText(this, "Please enter your email address.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
+
+            // --- THIS IS THE CORE FIREBASE LOGIC ---
+            // It sends a password reset link to the user's email.
+            auth.sendPasswordResetEmail(email)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        Toast.makeText(this, "Password reset link sent to your email.", Toast.LENGTH_LONG).show()
+                        finish() // Close this screen and go back to the sign-in page
+                    } else {
+                        Toast.makeText(this, "Failed to send reset link: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
         }
     }
 }
