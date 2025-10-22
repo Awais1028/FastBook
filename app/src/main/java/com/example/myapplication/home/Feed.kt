@@ -3,12 +3,14 @@ package com.example.myapplication.home
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.myapplication.R
+import com.example.myapplication.info.LibraryFragment
 import com.google.firebase.database.*
 
 class FeedFragment : Fragment() {
@@ -90,6 +92,7 @@ class FeedFragment : Fragment() {
         }
         Log.d(TAG, "FeedFragment resumed.")
     }
+
 
     // --- UPDATED: Release all players and listeners when the view is destroyed ---
     override fun onDestroyView() {

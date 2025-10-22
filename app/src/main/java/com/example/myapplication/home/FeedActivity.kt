@@ -2,6 +2,7 @@ package com.example.myapplication.home
 
 import android.os.Bundle
 import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
@@ -11,9 +12,11 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.example.myapplication.notifications.NotificationFragment
 import com.example.myapplication.profile.EditProfileFragment
 import com.example.myapplication.R
+import com.example.myapplication.info.LibraryFragment
 import com.example.myapplication.post.NewPostFragment
 import com.example.myapplication.profile.ProfileFragment
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import kotlin.text.replace
 
 class FeedActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,7 +94,19 @@ class FeedActivity : AppCompatActivity() {
         menuInflater.inflate(R.menu.main_menu, menu) // Inflate the 3-dotted menu
         return true
     }
-
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_library -> {
+                // Open the LibraryFragment when the library item is clicked
+                supportFragmentManager.beginTransaction()
+                    .replace(R.id.container, LibraryFragment())
+                    .addToBackStack(null)
+                    .commit()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
     // Handle options menu item selections
     /*override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {

@@ -13,5 +13,9 @@
         android:title="Extra Features"
         android:icon="@drawable/ic_home"
         app:showAsAction="never"/>
+    <item
+        android:id="@+id/action_library"
+        android:title="Library"
+        app:showAsAction="never" />
 
 </menu>
