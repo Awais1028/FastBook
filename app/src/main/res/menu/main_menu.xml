@@ -17,5 +17,8 @@
         android:id="@+id/action_library"
         android:title="Library"
         app:showAsAction="never" />
-
+    <item
+        android:id="@+id/action_cafe"
+        android:title="Cafe"
+        app:showAsAction="never" />
 </menu>

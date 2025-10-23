@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/white">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/cafe_toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary" />
+
+    <ImageView
+        android:id="@+id/header_cafe_image"
+        android:layout_width="match_parent"
+        android:layout_height="180dp"
+        android:layout_below="@id/cafe_toolbar"
+        android:src="@drawable/cafe_image"
+        android:scaleType="centerCrop"
+        android:contentDescription="Cafe" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/cafe_menu_recycler_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/header_cafe_image"
+        android:padding="4dp"/>
+
+</RelativeLayout>

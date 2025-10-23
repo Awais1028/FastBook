@@ -12,6 +12,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.example.myapplication.notifications.NotificationFragment
 import com.example.myapplication.profile.EditProfileFragment
 import com.example.myapplication.R
+import com.example.myapplication.cafe.CafeFragment
 import com.example.myapplication.info.LibraryFragment
 import com.example.myapplication.post.NewPostFragment
 import com.example.myapplication.profile.ProfileFragment
@@ -100,6 +101,14 @@ class FeedActivity : AppCompatActivity() {
                 // Open the LibraryFragment when the library item is clicked
                 supportFragmentManager.beginTransaction()
                     .replace(R.id.container, LibraryFragment())
+                    .addToBackStack(null)
+                    .commit()
+                true
+            }
+            R.id.action_cafe -> {
+                // Open the LibraryFragment when the library item is clicked
+                supportFragmentManager.beginTransaction()
+                    .replace(R.id.container, CafeFragment())
                     .addToBackStack(null)
                     .commit()
                 true
