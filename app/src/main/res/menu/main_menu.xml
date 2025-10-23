@@ -21,4 +21,8 @@
         android:id="@+id/action_cafe"
         android:title="Cafe"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/action_campus_map"
+        android:title="Campus Map"
+        app:showAsAction="never" />
 </menu>

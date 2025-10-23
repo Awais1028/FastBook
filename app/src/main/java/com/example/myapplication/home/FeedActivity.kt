@@ -13,7 +13,8 @@ import com.example.myapplication.notifications.NotificationFragment
 import com.example.myapplication.profile.EditProfileFragment
 import com.example.myapplication.R
 import com.example.myapplication.cafe.CafeFragment
-import com.example.myapplication.info.LibraryFragment
+import com.example.myapplication.maps.CampusMapFragment
+import com.example.myapplication.library.LibraryFragment
 import com.example.myapplication.post.NewPostFragment
 import com.example.myapplication.profile.ProfileFragment
 import com.google.android.material.bottomnavigation.BottomNavigationView
@@ -109,6 +110,13 @@ class FeedActivity : AppCompatActivity() {
                 // Open the LibraryFragment when the library item is clicked
                 supportFragmentManager.beginTransaction()
                     .replace(R.id.container, CafeFragment())
+                    .addToBackStack(null)
+                    .commit()
+                true
+            }
+            R.id.action_campus_map -> {
+                supportFragmentManager.beginTransaction()
+                    .replace(R.id.container, CampusMapFragment())
                     .addToBackStack(null)
                     .commit()
                 true
