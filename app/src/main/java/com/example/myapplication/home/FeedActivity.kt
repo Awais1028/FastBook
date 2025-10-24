@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.ViewCompat
@@ -13,6 +14,7 @@ import com.example.myapplication.notifications.NotificationFragment
 import com.example.myapplication.profile.EditProfileFragment
 import com.example.myapplication.R
 import com.example.myapplication.cafe.CafeFragment
+import com.example.myapplication.chats.ChatsFragment
 import com.example.myapplication.offices.FacultyMapFragment
 import com.example.myapplication.maps.CampusMapFragment
 import com.example.myapplication.library.LibraryFragment
@@ -40,7 +42,13 @@ class FeedActivity : AppCompatActivity() {
                 topBar.visibility = View.VISIBLE
             }
         }
-
+        val messageIcon = findViewById<ImageView>(R.id.messageIcon)
+        messageIcon.setOnClickListener {
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.container, ChatsFragment())
+                .addToBackStack(null) // Allows the user to press back to return to the feed
+                .commit()
+        }
         // Set up the Toolbar (with 3-dotted menu)
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)

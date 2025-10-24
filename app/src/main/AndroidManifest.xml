@@ -40,6 +40,9 @@
             android:exported="false"
             android:theme="@style/Theme.MyApplication3" />
         <activity
+            android:name=".chats.MessageChatActivity"
+            android:theme="@style/Theme.MyApplication2"/>
+        <activity
             android:name=".splash.SplashActivity"
             android:exported="true"
             android:theme="@style/Theme.MyApplication2">

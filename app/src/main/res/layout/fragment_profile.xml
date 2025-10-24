@@ -78,6 +78,7 @@
         app:layout_constraintTop_toTopOf="@+id/edit_profile_button">
 
         <LinearLayout
+            android:id="@+id/followers_layout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:gravity="center"
@@ -98,6 +99,7 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/following_layout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="32dp"

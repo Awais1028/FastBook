@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -27,6 +28,8 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
     private lateinit var followingCount: TextView
 
     // For "My Posts" feature
+    private lateinit var followersLayout: LinearLayout // 👈 NEW
+    private lateinit var followingLayout: LinearLayout
     private lateinit var myPostsRecyclerView: RecyclerView
     private lateinit var feedAdapter: FeedAdapter
     private val postList = mutableListOf<FeedItem>()
@@ -58,7 +61,15 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
                 loadUserPosts()
             }
         }
+        followersLayout = view.findViewById(R.id.followers_layout) // 👈 NEW
+        followingLayout = view.findViewById(R.id.following_layout) // 👈 NEW
+        followersLayout.setOnClickListener {
+            openListFragment("Followers")
+        }
 
+        followingLayout.setOnClickListener {
+            openListFragment("Following")
+        }
         // Logic to show/hide the correct buttons
         if (profileUserId == currentUserId) {
             editProfileButton.visibility = View.VISIBLE
@@ -105,6 +116,18 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
             }
             override fun onCancelled(error: DatabaseError) {}
         })
+    }
+    private fun openListFragment(title: String) {
+        val fragment = FollowListFragment()
+        val args = Bundle()
+        args.putString("id", profileUserId)
+        args.putString("title", title)
+        fragment.arguments = args
+
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.container, fragment)
+            .addToBackStack(null)
+            .commit()
     }
 
     private fun getFollowerAndFollowingCount() {
