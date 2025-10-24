@@ -25,4 +25,8 @@
         android:id="@+id/action_campus_map"
         android:title="Campus Map"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/action_faculty_map"
+        android:title="Faculty Map"
+        app:showAsAction="never" />
 </menu>

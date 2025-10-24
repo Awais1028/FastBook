@@ -1,12 +1,15 @@
 package com.example.myapplication.comments
 
+import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.myapplication.R
+import com.example.myapplication.profile.ProfileFragment
 import com.google.firebase.database.FirebaseDatabase
 import de.hdodenhof.circleimageview.CircleImageView // Import CircleImageView
 
@@ -48,5 +51,26 @@ class CommentAdapter(private val commentList: List<Comment>) : RecyclerView.Adap
                 holder.username.text = "Error User"
                 holder.profileImage.setImageResource(R.drawable.ic_profile) // Fallback
             }
+        holder.itemView.setOnClickListener {
+            val currentPosition = holder.adapterPosition
+            if (currentPosition != RecyclerView.NO_POSITION) {
+                val clickedComment = commentList[currentPosition]
+
+                // Create the ProfileFragment
+                val fragment = ProfileFragment()
+
+                // Create a bundle to pass the UID of the commenter
+                val args = Bundle()
+                args.putString("uid", clickedComment.publisher)
+                fragment.arguments = args
+
+                // Perform the fragment transaction to open the profile
+                val activity = holder.itemView.context as AppCompatActivity
+                activity.supportFragmentManager.beginTransaction()
+                    .replace(R.id.container, fragment) // Use your main fragment container ID
+                    .addToBackStack(null)
+                    .commit()
+            }
+        }
     }
 }

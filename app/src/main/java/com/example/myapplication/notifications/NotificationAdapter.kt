@@ -33,6 +33,7 @@ class NotificationAdapter(
         val item = notifications[position]
         holder.messageText.text = item.text
 
+
         // Fetch user info (name and profile picture) of the person who acted
         FirebaseDatabase.getInstance().getReference("Users").child(item.actorId).get()
             .addOnSuccessListener { dataSnapshot ->
@@ -51,11 +52,28 @@ class NotificationAdapter(
                 holder.titleText.text = "Notification"
                 holder.profileImage.setImageResource(R.drawable.ic_profile) // Fallback
             }
-
-        // Your existing click listener for navigating to the post is correct
         holder.itemView.setOnClickListener {
-            // ... (no changes needed here)
+            val currentPosition = holder.adapterPosition
+            if (currentPosition != RecyclerView.NO_POSITION) {
+                val clickedNotification = notifications[currentPosition]
+
+                // Create the PostDetailFragment instance
+                val fragment = PostDetailFragment()
+
+                // Create a bundle to pass the postId
+                val args = Bundle()
+                args.putString("postId", clickedNotification.postId)
+                fragment.arguments = args
+
+                // Perform the fragment transaction to open the post
+                val activity = holder.itemView.context as AppCompatActivity
+                activity.supportFragmentManager.beginTransaction()
+                    .replace(R.id.container, fragment)
+                    .addToBackStack(null)
+                    .commit()
+            }
         }
+
     }
 
     override fun getItemCount(): Int = notifications.size

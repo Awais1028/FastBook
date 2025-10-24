@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="OfficeCabin">
+        <item name="android:layout_width">50dp</item>
+        <item name="android:layout_height">30dp</item>
+        <item name="android:background">@drawable/cell_border</item>
+        <item name="android:gravity">center</item>
+        <item name="android:padding">4dp</item>
+        <item name="android:textColor">@android:color/black</item>
+        <item name="android:textSize">6sp</item>
+    </style>
+
+    <style name="OfficeCabin.Highlighted">
+        <item name="android:background">@drawable/cell_border_highlighted</item>
+    </style>
+
+
+<style name="MapCell">
+    <item name="android:layout_width">100dp</item>
+    <item name="android:layout_height">60dp</item>
+    <item name="android:background">@drawable/cell_border</item>
+    <item name="android:gravity">center</item>
+    <item name="android:padding">8dp</item>
+    <item name="android:textColor">@android:color/black</item>
+    <item name="android:textSize">12sp</item>
+</style>
+
+<style name="MapCell.Teacher">
+</style>
+
+</resources>

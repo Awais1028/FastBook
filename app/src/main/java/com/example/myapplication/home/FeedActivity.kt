@@ -13,6 +13,7 @@ import com.example.myapplication.notifications.NotificationFragment
 import com.example.myapplication.profile.EditProfileFragment
 import com.example.myapplication.R
 import com.example.myapplication.cafe.CafeFragment
+import com.example.myapplication.offices.FacultyMapFragment
 import com.example.myapplication.maps.CampusMapFragment
 import com.example.myapplication.library.LibraryFragment
 import com.example.myapplication.post.NewPostFragment
@@ -117,6 +118,13 @@ class FeedActivity : AppCompatActivity() {
             R.id.action_campus_map -> {
                 supportFragmentManager.beginTransaction()
                     .replace(R.id.container, CampusMapFragment())
+                    .addToBackStack(null)
+                    .commit()
+                true
+            }
+            R.id.action_faculty_map -> {
+                supportFragmentManager.beginTransaction()
+                    .replace(R.id.container, FacultyMapFragment())
                     .addToBackStack(null)
                     .commit()
                 true

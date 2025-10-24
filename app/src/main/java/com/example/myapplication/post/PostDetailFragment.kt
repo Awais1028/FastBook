@@ -49,7 +49,7 @@ class PostDetailFragment : Fragment() {
                 loadPost() // Load the single post
             }
         }
-
+        Log.d("PostDetailDebug", "Received postId: $postId")
         return view
     }
 
