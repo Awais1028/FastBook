@@ -3,14 +3,12 @@ package com.example.myapplication.home
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
-import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.myapplication.R
-import com.example.myapplication.library.LibraryFragment
 import com.google.firebase.database.*
 
 class FeedFragment : Fragment() {
@@ -23,6 +21,7 @@ class FeedFragment : Fragment() {
     private val feedList = mutableListOf<FeedItem>()
     private lateinit var adapter: FeedAdapter
     private lateinit var recyclerView: RecyclerView
+    private lateinit var layoutManager: LinearLayoutManager
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -35,16 +34,29 @@ class FeedFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         recyclerView = view.findViewById(R.id.feedRecyclerView)
-        recyclerView.layoutManager = LinearLayoutManager(requireContext())
+        layoutManager = LinearLayoutManager(requireContext())
+        recyclerView.layoutManager = layoutManager
 
-        // Use a post block to ensure the layout has been measured
         recyclerView.post {
+            if (view.context == null) return@post
+
             val parentWidth = recyclerView.width
             if (parentWidth > 0) {
-                // Initialize the adapter with the measured width
                 adapter = FeedAdapter(feedList, parentWidth)
                 recyclerView.adapter = adapter
-                loadPosts() // Load posts only after the adapter is set
+
+                // 1. Add Scroll Listener to detect when scrolling stops
+                recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                    override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                        super.onScrollStateChanged(recyclerView, newState)
+                        if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                            // Only play video when scrolling stops
+                            playVisibleVideo()
+                        }
+                    }
+                })
+
+                loadPosts()
             } else {
                 Log.e(TAG, "RecyclerView width is 0. Cannot initialize adapter.")
             }
@@ -65,6 +77,8 @@ class FeedFragment : Fragment() {
                 feedList.reverse()
                 if (::adapter.isInitialized) {
                     adapter.notifyDataSetChanged()
+                    // 2. Play the first video automatically when data loads
+                    recyclerView.post { playVisibleVideo() }
                 }
             }
 
@@ -75,34 +89,91 @@ class FeedFragment : Fragment() {
         postsQuery.addValueEventListener(postsListener!!)
     }
 
-    // --- NEW: Pause all players when the fragment is not visible ---
+    // --- NEW LOGIC: Play ONLY the single most visible video ---
+    private fun playVisibleVideo() {
+        if (!::adapter.isInitialized) return
+
+        // 1. First, pause ALL players to stop the "all playing" issue
+        adapter.pauseAllPlayers()
+
+        // 2. Find visible range
+        val firstVisible = layoutManager.findFirstVisibleItemPosition()
+        val lastVisible = layoutManager.findLastVisibleItemPosition()
+
+        if (firstVisible < 0) return
+
+        // 3. Find the "best" item (the one taking up the most screen space)
+        var bestPosition = -1
+        var maxPercentage = 0
+
+        for (i in firstVisible..lastVisible) {
+            val view = layoutManager.findViewByPosition(i) ?: continue
+
+            // Calculate how much of the item is actually visible
+            val location = IntArray(2)
+            view.getLocationOnScreen(location)
+            val viewTop = location[1]
+            val viewBottom = viewTop + view.height
+            val screenHeight = resources.displayMetrics.heightPixels
+
+            // Basic visibility check (simplified for stability)
+            val visibleTop = maxOf(viewTop, 0)
+            val visibleBottom = minOf(viewBottom, screenHeight)
+            val visibleHeight = maxOf(0, visibleBottom - visibleTop)
+
+            val percentage = if (view.height > 0) (visibleHeight * 100) / view.height else 0
+
+            // If item is more than 50% visible, it's our candidate
+            if (percentage >= 50) {
+                bestPosition = i
+                break // Stop at the first mostly visible item (top-down)
+            }
+        }
+
+        // 4. Play only that winner
+        if (bestPosition != -1) {
+            val holder = recyclerView.findViewHolderForAdapterPosition(bestPosition)
+            // You might need to cast this if your holder class is named differently
+            if (holder is FeedAdapter.FeedViewHolder) {
+                // Ensure your FeedViewHolder has a 'play()' or similar method exposed
+                // If not, you might need to add one or access the player directly if public
+                holder.startPlayer()
+            }
+        }
+    }
+
+    // --- Lifecycle Fixes ---
+
+    override fun onHiddenChanged(hidden: Boolean) {
+        super.onHiddenChanged(hidden)
+        if (::adapter.isInitialized) {
+            if (hidden) {
+                adapter.pauseAllPlayers()
+            } else {
+                // CHANGED: Instead of resumeAllPlayers(), verify visibility first
+                playVisibleVideo()
+            }
+        }
+    }
+
     override fun onPause() {
         super.onPause()
-        if (::adapter.isInitialized) {
-            adapter.pauseAllPlayers()
-        }
-        Log.d(TAG, "FeedFragment paused.")
+        if (::adapter.isInitialized) adapter.pauseAllPlayers()
     }
 
-    // --- NEW: Resume all players when the fragment becomes visible again ---
     override fun onResume() {
         super.onResume()
-        if (::adapter.isInitialized) {
-            adapter.resumeAllPlayers()
+        if (::adapter.isInitialized && !isHidden) {
+            // CHANGED: Play only visible
+            playVisibleVideo()
         }
-        Log.d(TAG, "FeedFragment resumed.")
     }
 
-
-    // --- UPDATED: Release all players and listeners when the view is destroyed ---
     override fun onDestroyView() {
         super.onDestroyView()
-        if (::adapter.isInitialized) {
-            adapter.releaseAllPlayers()
-        }
+        if (::adapter.isInitialized) adapter.releaseAllPlayers()
         if (::postsRef.isInitialized && postsListener != null) {
             postsRef.removeEventListener(postsListener!!)
         }
-        Log.d(TAG, "FeedFragment view destroyed.")
     }
 }

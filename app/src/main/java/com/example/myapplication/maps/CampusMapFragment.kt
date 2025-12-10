@@ -4,8 +4,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
+import android.widget.ImageView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import com.example.myapplication.R
 
@@ -17,15 +18,23 @@ class CampusMapFragment : Fragment() {
     ): View? {
         val view = inflater.inflate(R.layout.fragment_campus_map, container, false)
 
-        // Set up the toolbar with a back button
-        val toolbar: Toolbar = view.findViewById(R.id.map_toolbar)
-        (activity as AppCompatActivity).setSupportActionBar(toolbar)
-        (activity as AppCompatActivity).supportActionBar?.title = "Campus Map"
-        (activity as AppCompatActivity).supportActionBar?.setDisplayHomeAsUpEnabled(true)
-
-        // Handle the back button click
-        toolbar.setNavigationOnClickListener {
+        // 1. Setup Custom Back Button
+        val btnBack = view.findViewById<ImageView>(R.id.btnBack)
+        btnBack.setOnClickListener {
             parentFragmentManager.popBackStack()
+        }
+
+        // 2. Handle Window Insets (Margin for Edge-to-Edge)
+        val originalMargin = (16 * resources.displayMetrics.density).toInt()
+
+        ViewCompat.setOnApplyWindowInsetsListener(view) { v, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+
+            val params = btnBack.layoutParams as ViewGroup.MarginLayoutParams
+            params.topMargin = originalMargin + insets.top
+            btnBack.layoutParams = params
+
+            WindowInsetsCompat.CONSUMED
         }
 
         return view

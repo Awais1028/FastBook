@@ -4,10 +4,11 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
+import android.widget.ImageView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.myapplication.R
 
@@ -20,16 +21,35 @@ class CafeFragment : Fragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        val view = inflater.inflate(R.layout.fragment_cafe, container, false) // Ensure your layout is named fragment_cafe.xml
+        // Inflate the new layout
+        val view = inflater.inflate(R.layout.fragment_cafe, container, false)
 
-        // Set up the toolbar
-        val toolbar: Toolbar = view.findViewById(R.id.cafe_toolbar)
-        (activity as AppCompatActivity).setSupportActionBar(toolbar)
-        (activity as AppCompatActivity).supportActionBar?.title = "Cafe Menu"
-        (activity as AppCompatActivity).supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        toolbar.setNavigationOnClickListener { parentFragmentManager.popBackStack() }
+        // 1. Setup Custom Back Button
+        val btnBack = view.findViewById<ImageView>(R.id.btnBack)
+        btnBack.setOnClickListener {
+            parentFragmentManager.popBackStack()
+        }
 
-        // --- Create the full, categorized menu list ---
+        // 2. Handle Window Insets (FIX: Use Margin so button isn't squashed)
+        // Convert 16dp (original XML margin) to pixels
+        val originalMargin = (16 * resources.displayMetrics.density).toInt()
+
+        ViewCompat.setOnApplyWindowInsetsListener(view) { v, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+
+            // Get current layout params as MarginLayoutParams
+            val params = btnBack.layoutParams as ViewGroup.MarginLayoutParams
+
+            // Add status bar height (insets.top) to the original 16dp margin
+            params.topMargin = originalMargin + insets.top
+
+            // Apply the updated params back to the button
+            btnBack.layoutParams = params
+
+            WindowInsetsCompat.CONSUMED
+        }
+
+        // 3. Create Menu Data
         val fullMenu = mutableListOf<CafeDisplayItem>()
 
         fullMenu.add(CafeCategory("Chinese"))
@@ -38,7 +58,7 @@ class CafeFragment : Fragment() {
 
         fullMenu.add(CafeCategory("Vegetable Gravy"))
         fullMenu.add(CafeMenuItem("Haleem", R.drawable.haleem))
-        fullMenu.add(CafeMenuItem("Kari Chawal", R.drawable.karichawal))
+        fullMenu.add(CafeMenuItem("Kari Chawal", R.drawable.kari_chawal))
 
         fullMenu.add(CafeCategory("Karahi"))
         fullMenu.add(CafeMenuItem("Boneless Karahi", R.drawable.bonelesskarahi))
@@ -50,10 +70,20 @@ class CafeFragment : Fragment() {
         fullMenu.add(CafeMenuItem("Sandwich", R.drawable.sandwich))
         fullMenu.add(CafeMenuItem("Shami Burger", R.drawable.andashamiburger))
 
-        // --- Set up the RecyclerView ---
-        recyclerView = view.findViewById(R.id.cafe_menu_recycler_view) // Ensure this ID is in fragment_cafe.xml
-        recyclerView.layoutManager = LinearLayoutManager(context)
+        // 4. Setup RecyclerView (Grid)
+        recyclerView = view.findViewById(R.id.cafe_menu_recycler_view)
         cafeMenuAdapter = CafeMenuAdapter(fullMenu)
+
+        val gridLayoutManager = GridLayoutManager(context, 2)
+
+        // Logic: Headers take 2 columns (Full Width), Items take 1 column
+        gridLayoutManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+            override fun getSpanSize(position: Int): Int {
+                return if (cafeMenuAdapter.getItemViewType(position) == CafeMenuAdapter.TYPE_HEADER) 2 else 1
+            }
+        }
+
+        recyclerView.layoutManager = gridLayoutManager
         recyclerView.adapter = cafeMenuAdapter
 
         return view

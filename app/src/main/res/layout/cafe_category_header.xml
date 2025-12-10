@@ -8,6 +8,6 @@
     android:paddingEnd="16dp"
     android:paddingBottom="8dp"
     android:text="Category Title"
-    android:textColor="@color/purple_700"
+    android:textColor="#6200EE"
     android:textSize="22sp"
     android:textStyle="bold" />

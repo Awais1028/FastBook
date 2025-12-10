@@ -1,29 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white">
-
-    <androidx.appcompat.widget.Toolbar
-        android:id="@+id/cafe_toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="?attr/colorPrimary" />
+    android:background="#FFFFFF">
 
     <ImageView
         android:id="@+id/header_cafe_image"
         android:layout_width="match_parent"
-        android:layout_height="180dp"
-        android:layout_below="@id/cafe_toolbar"
-        android:src="@drawable/cafe_image"
+        android:layout_height="280dp"
         android:scaleType="centerCrop"
-        android:contentDescription="Cafe" />
+        android:src="@drawable/cafe_image"
+        android:contentDescription="Cafe Interior" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/cafe_menu_recycler_view"
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/header_cafe_image"
-        android:padding="4dp"/>
+        android:layout_marginTop="220dp"
+        android:background="@drawable/bg_rounded_top"
+        android:fillViewport="true">
 
-</RelativeLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="60dp">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/cafe_menu_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false"
+                android:padding="8dp" />
+        </LinearLayout>
+
+    </androidx.core.widget.NestedScrollView>
+
+    <ImageView
+        android:id="@+id/btnBack"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_margin="16dp"
+        android:background="@drawable/bg_grey_box"
+        android:padding="8dp"
+        android:src="@drawable/ic_arrow_back"
+        app:tint="#000000" />
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -3,22 +3,22 @@
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
     <application
-
+        android:resizeableActivity="true"
         android:usesCleartextTraffic="true"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         tools:replace="android:fullBackupContent"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/fastbooklogo"
         android:label=""
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@drawable/fastbooklogo"
         android:supportsRtl="true"
         android:theme="@style/Theme.MyApplication"
         tools:targetApi="31">
         <activity
             android:name=".home.FeedActivity"
             android:exported="false"
-            android:theme="@style/Theme.MyApplication2" />
+            android:theme="@style/Theme.MyApplication3" />
         <activity
             android:name=".auth.ChangePasswordActivity"
             android:exported="false"
@@ -48,7 +48,6 @@
             android:theme="@style/Theme.MyApplication2">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>

@@ -2,5 +2,10 @@
 <resources>
     <style name="Theme.MyApplication2" parent="Theme.AppCompat.Light.NoActionBar"/>
     <style name="Theme.MyApplication" parent="android:Theme.Material.Light.NoActionBar" />
-    <style name="Theme.MyApplication3" parent="Theme.MaterialComponents.DayNight.NoActionBar"/>
+    <style name="Theme.MyApplication3" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:statusBarColor">#93B1B5</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">#FFFFFF</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
 </resources>

@@ -12,47 +12,57 @@ class CafeMenuAdapter(private val displayList: List<CafeDisplayItem>) :
     RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
-        private const val TYPE_CATEGORY = 0
-        private const val TYPE_MENU_ITEM = 1
+        const val TYPE_HEADER = 0
+        const val TYPE_ITEM = 1
     }
 
-    // ViewHolder for Category Headers
-    inner class CategoryViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val categoryTitle: TextView = itemView.findViewById(R.id.category_title)
-    }
-
-    // ViewHolder for Menu Items
-    inner class MenuItemViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val itemImage: ImageView = itemView.findViewById(R.id.menu_item_image)
-        val itemName: TextView = itemView.findViewById(R.id.menu_item_name)
-    }
-
+    // --- FIX: Add 'else' branch to satisfy the compiler ---
     override fun getItemViewType(position: Int): Int {
         return when (displayList[position]) {
-            is CafeCategory -> TYPE_CATEGORY
-            is CafeMenuItem -> TYPE_MENU_ITEM
+            is CafeCategory -> TYPE_HEADER
+            is CafeMenuItem -> TYPE_ITEM
+            else -> throw IllegalArgumentException("Invalid Item Type") // <--- FIX HERE
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-        return if (viewType == TYPE_CATEGORY) {
-            val view = LayoutInflater.from(parent.context).inflate(R.layout.cafe_category_header, parent, false)
+        return if (viewType == TYPE_HEADER) {
+            // Inflate Header XML
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.cafe_category_header, parent, false)
             CategoryViewHolder(view)
         } else {
-            val view = LayoutInflater.from(parent.context).inflate(R.layout.cafe_menu_item, parent, false)
+            // Inflate Grid Card XML
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.cafe_menu_item, parent, false)
             MenuItemViewHolder(view)
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        val item = displayList[position]
+
+        // Bind Header
+        if (holder is CategoryViewHolder && item is CafeCategory) {
+            holder.categoryTitle.text = item.title
+        }
+        // Bind Food Card
+        else if (holder is MenuItemViewHolder && item is CafeMenuItem) {
+            holder.itemName.text = item.name
+            holder.itemImage.setImageResource(item.imageResId)
         }
     }
 
     override fun getItemCount(): Int = displayList.size
 
-    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        val item = displayList[position]
-        if (holder is CategoryViewHolder && item is CafeCategory) {
-            holder.categoryTitle.text = item.title
-        } else if (holder is MenuItemViewHolder && item is CafeMenuItem) {
-            holder.itemName.text = item.name
-            holder.itemImage.setImageResource(item.imageResId)
-        }
+    // --- ViewHolders ---
+
+    inner class CategoryViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val categoryTitle: TextView = itemView.findViewById(R.id.category_title)
+    }
+
+    inner class MenuItemViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val itemImage: ImageView = itemView.findViewById(R.id.menu_item_image)
+        val itemName: TextView = itemView.findViewById(R.id.menu_item_name)
     }
 }

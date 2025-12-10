@@ -133,7 +133,16 @@
             android:text="LOG IN"
             android:textAllCaps="true"
             android:textColor="@android:color/white" />
-
+        <ProgressBar
+            android:id="@+id/signInProgressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:elevation="10dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
         <TextView
             android:id="@+id/orLoginByText"
             android:layout_width="match_parent"

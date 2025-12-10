@@ -1,168 +1,204 @@
 package com.example.myapplication.home
 
 import android.os.Bundle
-import android.view.Menu
-import android.view.MenuItem
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.PopupMenu
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import com.example.myapplication.notifications.NotificationFragment
-import com.example.myapplication.profile.EditProfileFragment
+import androidx.core.view.updatePadding
+import androidx.fragment.app.Fragment
 import com.example.myapplication.R
 import com.example.myapplication.cafe.CafeFragment
 import com.example.myapplication.chats.ChatsFragment
-import com.example.myapplication.offices.FacultyMapFragment
-import com.example.myapplication.maps.CampusMapFragment
 import com.example.myapplication.library.LibraryFragment
+import com.example.myapplication.maps.CampusMapFragment
+import com.example.myapplication.notifications.NotificationFragment
+import com.example.myapplication.offices.FacultyMapFragment
 import com.example.myapplication.post.NewPostFragment
+import com.example.myapplication.profile.EditProfileFragment
 import com.example.myapplication.profile.ProfileFragment
+import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.bottomnavigation.BottomNavigationView
-import kotlin.text.replace
 
 class FeedActivity : AppCompatActivity() {
+
+    private lateinit var appBarLayout: AppBarLayout
+    private lateinit var topBar: View
+    private lateinit var container: FrameLayout
+
+    // 1. Keep references to your fragments so they aren't destroyed
+    private var feedFragment: Fragment? = null
+    private var profileFragment: Fragment? = null
+    private var notificationFragment: Fragment? = null
+    private var newPostFragment: Fragment? = null
+
+    // Track which fragment is currently visible
+    private var activeFragment: Fragment? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_feed) // layout with a container for the fragment
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        setContentView(R.layout.activity_feed)
+
+        // Initialize Views
+        appBarLayout = findViewById(R.id.appBarLayout)
+        val toolbar: Toolbar = findViewById(R.id.toolbar)
+        topBar = findViewById(R.id.topBar)
+        container = findViewById(R.id.container)
+        val messageIcon = findViewById<ImageView>(R.id.messageIcon)
+        val menuIcon = findViewById<ImageView>(R.id.menuIcon)
+        val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_navigation)
+
+        setSupportActionBar(toolbar)
         supportActionBar?.title = ""
-        // Enable edge-to-edge content
+
+        // Padding Fixes
+        ViewCompat.setOnApplyWindowInsetsListener(toolbar) { view, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.updatePadding(top = insets.top)
+            WindowInsetsCompat.CONSUMED
+        }
+        // 5. FIX 2: Apply BOTTOM Padding to Container
+        ViewCompat.setOnApplyWindowInsetsListener(container) { view, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.updatePadding(bottom = insets.bottom)
+
+            // RETURN windowInsets instead of CONSUMED.
+            // This lets the Top/Status Bar info pass through to the Fragment.
+            windowInsets
+        }
+
         ViewCompat.getWindowInsetsController(window.decorView)?.let { controller ->
-            controller.hide(WindowInsetsCompat.Type.statusBars()) // Hide status bar for full screen
+            controller.isAppearanceLightStatusBars = true
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
-        val topBar = findViewById<View>(R.id.topBar)
+
+        // Back Stack Listener (For Sub-fragments like EditProfile/Chats)
         supportFragmentManager.addOnBackStackChangedListener {
-            val currentFragment = supportFragmentManager.findFragmentById(R.id.container)
-            if (currentFragment is EditProfileFragment) {
-                topBar.visibility = View.GONE
-            } else {
-                topBar.visibility = View.VISIBLE
+            container.post {
+                val current = supportFragmentManager.findFragmentById(R.id.container)
+                // If stack is empty, it means we are on a main tab (activeFragment)
+                updateHeaderVisibility(current ?: activeFragment)
             }
         }
-        val messageIcon = findViewById<ImageView>(R.id.messageIcon)
+
         messageIcon.setOnClickListener {
+            // Chats is a sub-screen, so we use replace() to push it on top
             supportFragmentManager.beginTransaction()
                 .replace(R.id.container, ChatsFragment())
-                .addToBackStack(null) // Allows the user to press back to return to the feed
+                .addToBackStack(null)
                 .commit()
         }
-        // Set up the Toolbar (with 3-dotted menu)
-        val toolbar: Toolbar = findViewById(R.id.toolbar)
-        setSupportActionBar(toolbar)
 
-        // Replace fragment if it's the first time loading the activity
-        if (savedInstanceState == null) {
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.container, FeedFragment()) // Assuming container is the ID of your FrameLayout
-                .commit()
+        menuIcon.setOnClickListener { view ->
+            val popup = PopupMenu(this, view)
+            popup.menuInflater.inflate(R.menu.main_menu, popup.menu)
+            popup.setOnMenuItemClickListener { item ->
+                // Helper to load simple menu fragments
+                fun loadMenuFrag(frag: Fragment) {
+                    supportFragmentManager.beginTransaction()
+                        .replace(R.id.container, frag)
+                        .addToBackStack(null)
+                        .commit()
+                }
+                when (item.itemId) {
+                    R.id.action_library -> { loadMenuFrag(LibraryFragment()); true }
+                    R.id.action_cafe -> { loadMenuFrag(CafeFragment()); true }
+                    R.id.action_campus_map -> { loadMenuFrag(CampusMapFragment()); true }
+                    R.id.action_faculty_map -> { loadMenuFrag(FacultyMapFragment()); true }
+                    else -> false
+                }
+            }
+            popup.show()
         }
-        val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_navigation)
+
+        // 2. Initial Load: Load FeedFragment directly
+        if (savedInstanceState == null) {
+            feedFragment = FeedFragment()
+            supportFragmentManager.beginTransaction()
+                .add(R.id.container, feedFragment!!, "HOME")
+                .commit()
+            activeFragment = feedFragment
+            updateHeaderVisibility(feedFragment)
+        }
+
+        // 3. Updated Bottom Navigation: Use Hide/Show logic
         bottomNav.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_home -> {
-                    supportFragmentManager.beginTransaction()
-                        .replace(R.id.container, FeedFragment())
-                        .commit()
-                    topBar.visibility = View.VISIBLE
+                    if (feedFragment == null) feedFragment = FeedFragment()
+                    switchTab(feedFragment!!)
                     true
                 }
-
                 R.id.nav_profile -> {
-                    supportFragmentManager.beginTransaction()
-                        .replace(R.id.container, ProfileFragment())
-                        .addToBackStack(null)
-                        .commit()
+                    if (profileFragment == null) profileFragment = ProfileFragment()
+                    switchTab(profileFragment!!)
                     true
                 }
-
-                R.id.nav_notifications ->{
-                    supportFragmentManager.beginTransaction()
-                        .replace(R.id.container, NotificationFragment())
-                        .addToBackStack(null)
-                        .commit()
+                R.id.nav_notifications -> {
+                    if (notificationFragment == null) notificationFragment = NotificationFragment()
+                    switchTab(notificationFragment!!)
                     true
                 }
-
-                R.id.nav_add ->{
-                    supportFragmentManager.beginTransaction()
-                        .replace(R.id.container, NewPostFragment())
-                        .addToBackStack(null)
-                        .commit()
+                R.id.nav_add -> {
+                    if (newPostFragment == null) newPostFragment = NewPostFragment()
+                    switchTab(newPostFragment!!)
                     true
                 }
-
-                // Add other items similarly if needed
                 else -> false
             }
         }
     }
 
-    // Inflate the 3-dotted options menu
-    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
-        menuInflater.inflate(R.menu.main_menu, menu) // Inflate the 3-dotted menu
-        return true
-    }
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_library -> {
-                // Open the LibraryFragment when the library item is clicked
-                supportFragmentManager.beginTransaction()
-                    .replace(R.id.container, LibraryFragment())
-                    .addToBackStack(null)
-                    .commit()
-                true
-            }
-            R.id.action_cafe -> {
-                // Open the LibraryFragment when the library item is clicked
-                supportFragmentManager.beginTransaction()
-                    .replace(R.id.container, CafeFragment())
-                    .addToBackStack(null)
-                    .commit()
-                true
-            }
-            R.id.action_campus_map -> {
-                supportFragmentManager.beginTransaction()
-                    .replace(R.id.container, CampusMapFragment())
-                    .addToBackStack(null)
-                    .commit()
-                true
-            }
-            R.id.action_faculty_map -> {
-                supportFragmentManager.beginTransaction()
-                    .replace(R.id.container, FacultyMapFragment())
-                    .addToBackStack(null)
-                    .commit()
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
+    // --- NEW FUNCTION: Switches tabs without destroying them ---
+    private fun switchTab(targetFragment: Fragment) {
+        if (targetFragment == activeFragment) return
+
+        val transaction = supportFragmentManager.beginTransaction()
+
+        // Hide the current fragment
+        activeFragment?.let { transaction.hide(it) }
+
+        // Show or Add the target fragment
+        if (targetFragment.isAdded) {
+            transaction.show(targetFragment)
+        } else {
+            transaction.add(R.id.container, targetFragment)
         }
+
+        transaction.commit()
+        activeFragment = targetFragment
+
+        // Update header visibility immediately
+        container.post { updateHeaderVisibility(targetFragment) }
     }
-    // Handle options menu item selections
-    /*override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.home -> {
-                // Handle Home option here
-                true
-            }
-            R.id.nav_profile -> {
-                val profileFragment = ProfileFragment()
 
-                Log.d("FeedActivity", "Attempting to replace with ProfileFragment")
+    private fun updateHeaderVisibility(fragment: Fragment?) {
+        val params = container.layoutParams as CoordinatorLayout.LayoutParams
 
-                val transaction = supportFragmentManager.beginTransaction()
-                transaction.replace(R.id.container, profileFragment)  // Ensure container ID is correct
-                transaction.addToBackStack(null) // Optional
-                transaction.commit()
-
-                Log.d("FeedActivity", "ProfileFragment replaced successfully")
-
-                true
-            }
-
-            else -> super.onOptionsItemSelected(item)
+        if (fragment is ProfileFragment
+            || fragment is EditProfileFragment
+            || fragment is CafeFragment
+            || fragment is LibraryFragment
+            || fragment is CampusMapFragment
+            || fragment is FacultyMapFragment) {
+            appBarLayout.setExpanded(true, false)
+            appBarLayout.visibility = View.GONE
+            topBar.visibility = View.GONE
+            params.behavior = null
+        } else {
+            appBarLayout.visibility = View.VISIBLE
+            topBar.visibility = View.VISIBLE
+            appBarLayout.setExpanded(true, true)
+            params.behavior = AppBarLayout.ScrollingViewBehavior()
         }
-    }*/
+        container.requestLayout()
+    }
 }
