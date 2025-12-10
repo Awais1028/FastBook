@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.myapplication.R
 import com.google.firebase.database.*
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout // Add this import
 
 class FeedFragment : Fragment() {
 
@@ -61,6 +62,15 @@ class FeedFragment : Fragment() {
                 Log.e(TAG, "RecyclerView width is 0. Cannot initialize adapter.")
             }
         }
+        val swipeRefreshLayout = view.findViewById<SwipeRefreshLayout>(R.id.swipeRefreshLayout)
+
+        // Set the refresh color (optional, matches your app theme)
+        swipeRefreshLayout.setColorSchemeResources(R.color.purple_500) // Or whatever primary color you have
+
+        swipeRefreshLayout.setOnRefreshListener {
+            // Call your existing function to reload data
+            loadPosts()
+        }
     }
 
     private fun loadPosts() {
@@ -80,13 +90,22 @@ class FeedFragment : Fragment() {
                     // 2. Play the first video automatically when data loads
                     recyclerView.post { playVisibleVideo() }
                 }
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    view?.findViewById<SwipeRefreshLayout>(R.id.swipeRefreshLayout)?.isRefreshing = false
+
+                    // Optional: Show a little toast so they know it worked
+                    // Toast.makeText(context, "Feed Updated", Toast.LENGTH_SHORT).show()
+                }, 1000)
             }
 
             override fun onCancelled(error: DatabaseError) {
                 Log.w(TAG, "posts listener cancelled: ${error.message}")
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    view?.findViewById<SwipeRefreshLayout>(R.id.swipeRefreshLayout)?.isRefreshing = false
+                }, 1000)
             }
         }
-        postsQuery.addValueEventListener(postsListener!!)
+        postsQuery.addListenerForSingleValueEvent(postsListener!!)
     }
 
     // --- NEW LOGIC: Play ONLY the single most visible video ---

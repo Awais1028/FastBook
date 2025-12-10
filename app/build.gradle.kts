@@ -48,6 +48,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("androidx.fragment:fragment-ktx:1.7.1")
     implementation("com.github.MikeOrtiz:TouchImageView:3.0.1")
     implementation("com.facebook.shimmer:shimmer:0.5.0")

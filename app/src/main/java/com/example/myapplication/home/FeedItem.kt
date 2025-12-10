@@ -19,7 +19,7 @@ data class FeedItem(
     val timestamp: Long = 0L, // The correct data type for time
     val mediaWidth: Int = 0,
     val mediaHeight: Int = 0,
-    val likes: Map<String, Boolean> = emptyMap(),
+    val likes: HashMap<String, Boolean> = HashMap(),
     val commentCount: Int = 0
 )
 

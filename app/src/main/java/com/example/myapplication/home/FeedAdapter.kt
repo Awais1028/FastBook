@@ -39,7 +39,7 @@ class FeedAdapter(
     private val parentWidth: Int
 ) : RecyclerView.Adapter<FeedAdapter.FeedViewHolder>() {
 
-    // --- A list to keep track of all active ExoPlayers ---
+    // A list to keep track of active players (usually just 1 now)
     private val activePlayers = mutableListOf<ExoPlayer>()
 
     inner class FeedViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -52,12 +52,49 @@ class FeedAdapter(
         val likeIcon: ImageView = itemView.findViewById(R.id.iconLike)
         val commentIcon: ImageView = itemView.findViewById(R.id.iconComment)
         val likeCountText: TextView = itemView.findViewById(R.id.like_count_text)
-        var player: ExoPlayer? = null
         val commentCountText: TextView = itemView.findViewById(R.id.comment_count_text)
+        val bigHeart: ImageView = itemView.findViewById(R.id.big_heart)
 
-        // --- 👇 FIX 1: ADD THIS FUNCTION SO FRAGMENT CAN CALL IT 👇 ---
+        var player: ExoPlayer? = null
+        var videoUrl: String? = null // Store URL for lazy loading
+
         fun startPlayer() {
-            if (player != null) {
+            // 1. Release ALL other players to save memory (Fixes OOM Crash)
+            releaseAllPlayers()
+
+            // 2. Initialize this player if it doesn't exist yet
+            if (player == null && !videoUrl.isNullOrEmpty()) {
+                try {
+                    player = ExoPlayer.Builder(itemView.context).build().apply {
+                        setMediaItem(MediaItem.fromUri(videoUrl!!))
+                        repeatMode = ExoPlayer.REPEAT_MODE_ONE
+                        playWhenReady = true // Auto-play once created
+
+                        addListener(object : Player.Listener {
+                            override fun onPlaybackStateChanged(playbackState: Int) {
+                                if (playbackState == Player.STATE_READY) {
+                                    shimmerLayout.stopShimmer()
+                                    shimmerLayout.hideShimmer()
+                                    postImage.visibility = View.GONE // Hide thumbnail
+                                }
+                            }
+                            override fun onPlayerError(error: PlaybackException) {
+                                Log.e("FeedAdapter", "ExoPlayer error: ${error.message}", error)
+                            }
+                        })
+                        prepare()
+                    }
+                    postVideo.player = player
+                    postVideo.visibility = View.VISIBLE
+
+                    // Add to active list so we can clean it up later
+                    player?.let { activePlayers.add(it) }
+
+                } catch (e: Exception) {
+                    Log.e("FeedAdapter", "Error initializing player: ${e.message}")
+                }
+            } else {
+                // Already initialized, just resume
                 player?.playWhenReady = true
             }
         }
@@ -84,15 +121,16 @@ class FeedAdapter(
         val item = feedList[position]
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
 
-        // Release old player
+        // Release any existing player in this holder to be safe
         holder.player?.release()
         holder.player = null
         holder.postVideo.player = null
-        activePlayers.remove(holder.player)
+
+        // --- 1. Store the URL for later ---
+        holder.videoUrl = item.postVideoUrl
 
         // Comment count
-        val commentText = if (item.commentCount == 1) "1 " else "${item.commentCount} "
-        holder.commentCountText.text = commentText
+        holder.commentCountText.text = if (item.commentCount == 1) "1 " else "${item.commentCount} "
 
         // Reset Views
         holder.shimmerLayout.startShimmer()
@@ -102,6 +140,8 @@ class FeedAdapter(
 
         // Reset listeners
         holder.postImage.setOnClickListener(null)
+        holder.postImage.setOnTouchListener(null)
+        holder.postVideo.setOnTouchListener(null)
         holder.likeIcon.setOnClickListener(null)
         holder.commentIcon.setOnClickListener(null)
 
@@ -110,6 +150,7 @@ class FeedAdapter(
         holder.timeStampText.text = formatTimeAgo(item.timestamp)
         holder.postText.text = item.postText
 
+        // Click Listeners (Profile, Comments)
         holder.userNameText.setOnClickListener {
             val currentPosition = holder.adapterPosition
             if (currentPosition != RecyclerView.NO_POSITION) {
@@ -124,15 +165,6 @@ class FeedAdapter(
                     .addToBackStack(null)
                     .commit()
             }
-        }
-
-        // Like System
-        holder.likeCountText.text = "${item.likes.size} likes"
-        val isLiked = item.likes.containsKey(currentUserId)
-        if (isLiked) {
-            holder.likeIcon.setImageResource(R.drawable.ic_heart_filled)
-        } else {
-            holder.likeIcon.setImageResource(R.drawable.ic_heart)
         }
 
         holder.commentIcon.setOnClickListener {
@@ -152,21 +184,44 @@ class FeedAdapter(
             }
         }
 
-        holder.likeIcon.setOnClickListener {
-            val currentPosition = holder.adapterPosition
-            if (currentPosition != RecyclerView.NO_POSITION && currentUserId != null) {
-                val clickedPost = feedList[currentPosition]
-                val postLikesRef = FirebaseDatabase.getInstance().getReference("posts")
-                    .child(clickedPost.postId).child("likes")
+        // Like System (Initial UI)
+        holder.likeCountText.text = "${item.likes.size} likes"
+        val isLiked = item.likes.containsKey(currentUserId)
+        holder.likeIcon.setImageResource(if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart)
 
-                if (clickedPost.likes.containsKey(currentUserId)) {
-                    postLikesRef.child(currentUserId).removeValue()
-                } else {
-                    postLikesRef.child(currentUserId).setValue(true).addOnSuccessListener {
-                        addNotification(clickedPost.publisher, currentUserId, "liked your post.", clickedPost.postId)
-                    }
-                }
+        // Like Click Listener
+        holder.likeIcon.setOnClickListener {
+            if (currentUserId != null) {
+                toggleLike(holder, item, currentUserId)
             }
+        }
+
+        // Double Tap Detector
+        val gestureDetector = android.view.GestureDetector(holder.itemView.context, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: android.view.MotionEvent): Boolean = true
+            override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
+                if (currentUserId != null) {
+                    if (!item.likes.containsKey(currentUserId)) {
+                        toggleLike(holder, item, currentUserId)
+                    }
+                    animateBigHeart(holder.bigHeart)
+                }
+                return true
+            }
+            override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
+                if (holder.postImage.visibility == View.VISIBLE) holder.postImage.performClick()
+                else if (holder.postVideo.visibility == View.VISIBLE) holder.postVideo.performClick()
+                return true
+            }
+        })
+
+        holder.postImage.setOnTouchListener { _, event ->
+            gestureDetector.onTouchEvent(event)
+            true
+        }
+        holder.postVideo.setOnTouchListener { _, event ->
+            gestureDetector.onTouchEvent(event)
+            true
         }
 
         // Resize Logic
@@ -182,79 +237,58 @@ class FeedAdapter(
             viewToResize.requestLayout()
         } else {
             holder.postImage.layoutParams.height = 0
-            holder.postImage.requestLayout()
             holder.postVideo.layoutParams.height = 0
+            holder.postImage.requestLayout()
             holder.postVideo.requestLayout()
         }
 
-        // Media Display
+        // --- 2. Media Display (Lazy Loading Logic) ---
+        // We ONLY show the Thumbnail (Image) here. We DO NOT create the player yet.
+
         if (!item.postImageUrl.isNullOrEmpty()) {
+            // It's an Image Post
             holder.postImage.visibility = View.VISIBLE
             Glide.with(holder.itemView.context)
                 .load(item.postImageUrl)
                 .fitCenter()
                 .listener(createShimmerListener(holder))
                 .into(holder.postImage)
+
         } else if (!item.postVideoUrl.isNullOrEmpty()) {
             val videoUrl = item.postVideoUrl
-            if (videoUrl.contains("youtube.com") || videoUrl.contains("youtu.be")) {
-                // YouTube handling...
+
+            if (videoUrl?.contains("youtube.com") == true || videoUrl?.contains("youtu.be") == true) {
+                // YouTube Link - Use Image Thumbnail
                 val videoId = extractYoutubeId(videoUrl)
                 val thumbUrl = if (videoId != null) "https://img.youtube.com/vi/$videoId/hqdefault.jpg" else null
+
+                holder.postImage.visibility = View.VISIBLE
                 if (!thumbUrl.isNullOrEmpty()) {
-                    holder.postImage.visibility = View.VISIBLE
                     Glide.with(holder.itemView.context)
                         .load(thumbUrl)
                         .fitCenter()
                         .listener(createShimmerListener(holder))
                         .into(holder.postImage)
-                    holder.postImage.setOnClickListener {
-                        val currentPosition = holder.adapterPosition
-                        if (currentPosition != RecyclerView.NO_POSITION) {
-                            val clickedItem = feedList[currentPosition]
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(clickedItem.postVideoUrl))
-                            holder.itemView.context.startActivity(intent)
-                        }
-                    }
-                } else {
-                    holder.shimmerLayout.stopShimmer()
-                    holder.shimmerLayout.hideShimmer()
                 }
+                // Handle click to open YouTube
+                holder.postImage.setOnClickListener {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(videoUrl))
+                    holder.itemView.context.startActivity(intent)
+                }
+
             } else {
-                // Direct Video (ExoPlayer)
-                holder.postVideo.visibility = View.VISIBLE
-                try {
-                    holder.player = ExoPlayer.Builder(holder.itemView.context).build().apply {
-                        setMediaItem(MediaItem.fromUri(videoUrl))
-                        repeatMode = ExoPlayer.REPEAT_MODE_ONE
+                // Direct Video - Show Thumbnail only initially!
+                holder.postImage.visibility = View.VISIBLE // Show thumb placeholder
+                holder.postVideo.visibility = View.GONE    // Hide player
 
-                        // --- 👇 FIX 2: SET THIS TO FALSE SO THEY DON'T ALL START PLAYING 👇 ---
-                        playWhenReady = false
+                // Load a frame as thumbnail using Glide
+                Glide.with(holder.itemView.context)
+                    .load(videoUrl) // Glide can fetch video frame 0
+                    .fitCenter()
+                    .listener(createShimmerListener(holder))
+                    .into(holder.postImage)
 
-                        addListener(object : Player.Listener {
-                            override fun onPlaybackStateChanged(playbackState: Int) {
-                                if (playbackState == Player.STATE_READY) {
-                                    holder.shimmerLayout.stopShimmer()
-                                    holder.shimmerLayout.hideShimmer()
-                                }
-                            }
-                            override fun onPlayerError(error: PlaybackException) {
-                                Log.e("FeedAdapter", "ExoPlayer error: ${error.message}", error)
-                                holder.postVideo.visibility = View.GONE
-                                holder.shimmerLayout.stopShimmer()
-                                holder.shimmerLayout.hideShimmer()
-                            }
-                        })
-                        prepare()
-                    }
-                    holder.postVideo.player = holder.player
-                    activePlayers.add(holder.player!!)
-                } catch (e: Exception) {
-                    Log.e("FeedAdapter", "ExoPlayer setup error: ${e.message}", e)
-                    holder.postVideo.visibility = View.GONE
-                    holder.shimmerLayout.stopShimmer()
-                    holder.shimmerLayout.hideShimmer()
-                }
+                // NOTE: Player is created ONLY in startPlayer()
             }
         } else {
             holder.shimmerLayout.stopShimmer()
@@ -266,41 +300,15 @@ class FeedAdapter(
         if (postOwnerId == actorId) return
         val notifRef = FirebaseDatabase.getInstance().getReference("Notifications").child(postOwnerId)
         val notificationId = notifRef.push().key ?: return
-        val notification = NotificationItem(
-            notificationId = notificationId,
-            actorId = actorId,
-            text = text,
-            postId = postId,
-            timestamp = System.currentTimeMillis()
-        )
+        val notification = NotificationItem(notificationId, actorId, text, postId, System.currentTimeMillis())
         notifRef.child(notificationId).setValue(notification)
     }
 
     override fun onViewRecycled(holder: FeedViewHolder) {
         super.onViewRecycled(holder)
-        holder.player?.let {
-            it.release()
-            activePlayers.remove(it)
-        }
+        holder.player?.release()
         holder.player = null
-        holder.postVideo.player = null
-        holder.shimmerLayout.stopShimmer()
-        holder.shimmerLayout.hideShimmer()
-    }
-
-    // --- Lifecycle Methods ---
-
-    fun pauseAllPlayers() {
-        for (player in activePlayers) {
-            player.playWhenReady = false // Ensure we pause, not release here if we want to resume later
-        }
-        Log.d("FeedAdapter", "Paused ${activePlayers.size} players.")
-    }
-
-    fun resumeAllPlayers() {
-        // --- 👇 FIX 3: DO NOT BLINDLY PLAY ALL. LEFT EMPTY ON PURPOSE 👇 ---
-        // The FeedFragment calculates which SINGLE video to play and calls startPlayer().
-        // If we put code here, it will mess up that logic.
+        activePlayers.remove(holder.player)
     }
 
     fun releaseAllPlayers() {
@@ -308,7 +316,54 @@ class FeedAdapter(
             player.release()
         }
         activePlayers.clear()
-        Log.d("FeedAdapter", "Released all players.")
+    }
+
+    fun pauseAllPlayers() {
+        for (player in activePlayers) {
+            player.playWhenReady = false
+        }
+    }
+
+    fun resumeAllPlayers() {} // Handled by Fragment logic
+
+    private fun animateHeart(view: View) {
+        view.animate().scaleX(1.4f).scaleY(1.4f).setDuration(200)
+            .setInterpolator(android.view.animation.OvershootInterpolator())
+            .withEndAction {
+                view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(200)
+                    .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+            }.start()
+    }
+
+    private fun animateBigHeart(view: ImageView) {
+        view.alpha = 0.7f
+        view.visibility = View.VISIBLE
+        view.scaleX = 0.5f
+        view.scaleY = 0.5f
+        view.animate().scaleX(1.5f).scaleY(1.5f).alpha(0f).setDuration(400)
+            .withEndAction {
+                view.visibility = View.GONE
+                view.scaleX = 1f; view.scaleY = 1f; view.alpha = 1f
+            }.start()
+    }
+
+    private fun toggleLike(holder: FeedViewHolder, item: FeedItem, currentUserId: String) {
+        val postLikesRef = FirebaseDatabase.getInstance().getReference("posts").child(item.postId).child("likes")
+        animateHeart(holder.likeIcon)
+
+        if (item.likes.containsKey(currentUserId)) {
+            postLikesRef.child(currentUserId).removeValue()
+            item.likes.remove(currentUserId)
+            holder.likeIcon.setImageResource(R.drawable.ic_heart)
+            holder.likeCountText.text = "${item.likes.size} likes"
+        } else {
+            postLikesRef.child(currentUserId).setValue(true).addOnSuccessListener {
+                addNotification(item.publisher, currentUserId, "liked your post.", item.postId)
+            }
+            item.likes[currentUserId] = true
+            holder.likeIcon.setImageResource(R.drawable.ic_heart_filled)
+            holder.likeCountText.text = "${item.likes.size} likes"
+        }
     }
 
     override fun getItemCount(): Int = feedList.size
