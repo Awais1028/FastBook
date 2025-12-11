@@ -28,19 +28,19 @@
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="0dp"
                 android:paddingTop="8dp"
                 android:paddingEnd="8dp"
                 android:paddingBottom="8dp">
+
                 <ImageView
                     android:id="@+id/menuIcon"
                     android:layout_width="30dp"
                     android:layout_height="30dp"
-                    android:layout_marginStart="0dp"
                     android:contentDescription="Options"
                     android:padding="3dp"
                     android:src="@drawable/more_vert"
                     app:tint="#000000" />
+
                 <EditText
                     android:id="@+id/searchEditText"
                     android:layout_width="0dp"
@@ -60,7 +60,6 @@
                     android:id="@+id/messageIcon"
                     android:layout_width="30dp"
                     android:layout_height="30dp"
-                    android:layout_marginStart="0dp"
                     android:contentDescription="Messages"
                     android:padding="3dp"
                     android:src="@drawable/ic_message" />
@@ -74,7 +73,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#FFFFFF"
-        android:paddingBottom="60dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
     <com.google.android.material.bottomnavigation.BottomNavigationView

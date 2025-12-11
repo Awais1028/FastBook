@@ -14,9 +14,10 @@
         android:id="@+id/recycler_view_comments"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clipToPadding="false"
         android:layout_below="@id/comment_toolbar"
         android:layout_above="@+id/comment_input_layout"
-        android:padding="8dp" />
+        android:paddingBottom="100dp" />
 
     <RelativeLayout
         android:id="@+id/comment_input_layout"

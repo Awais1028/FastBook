@@ -32,14 +32,12 @@ class FeedActivity : AppCompatActivity() {
     private lateinit var appBarLayout: AppBarLayout
     private lateinit var topBar: View
     private lateinit var container: FrameLayout
+    private lateinit var bottomNav: BottomNavigationView
 
-    // 1. Keep references to your fragments so they aren't destroyed
     private var feedFragment: Fragment? = null
     private var profileFragment: Fragment? = null
     private var notificationFragment: Fragment? = null
     private var newPostFragment: Fragment? = null
-
-    // Track which fragment is currently visible
     private var activeFragment: Fragment? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,32 +45,41 @@ class FeedActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_feed)
 
-        // Initialize Views
         appBarLayout = findViewById(R.id.appBarLayout)
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         topBar = findViewById(R.id.topBar)
         container = findViewById(R.id.container)
+        bottomNav = findViewById(R.id.bottom_navigation)
         val messageIcon = findViewById<ImageView>(R.id.messageIcon)
         val menuIcon = findViewById<ImageView>(R.id.menuIcon)
-        val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_navigation)
 
         setSupportActionBar(toolbar)
         supportActionBar?.title = ""
 
-        // Padding Fixes
+        // 1. FIX TOP: Handle Toolbar Padding
         ViewCompat.setOnApplyWindowInsetsListener(toolbar) { view, windowInsets ->
             val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
             view.updatePadding(top = insets.top)
             WindowInsetsCompat.CONSUMED
         }
-        // 5. FIX 2: Apply BOTTOM Padding to Container
-        ViewCompat.setOnApplyWindowInsetsListener(container) { view, windowInsets ->
-            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.updatePadding(bottom = insets.bottom)
 
-            // RETURN windowInsets instead of CONSUMED.
-            // This lets the Top/Status Bar info pass through to the Fragment.
-            windowInsets
+        // 2. FIX BOTTOM: Handle Container Padding (Dynamic Math)
+        // We wait for the bottomNav to be measured, then apply padding
+        bottomNav.post {
+            ViewCompat.setOnApplyWindowInsetsListener(container) { view, windowInsets ->
+                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+
+                // Calculate total bottom space needed:
+                // System Bar (Black bar) + Bottom Menu Height
+                val bottomPadding = insets.bottom + bottomNav.height
+
+                view.updatePadding(bottom = bottomPadding)
+
+                // Return insets so children (like Maps) can use them if needed
+                windowInsets
+            }
+            // Trigger a pass to apply it immediately
+            ViewCompat.requestApplyInsets(container)
         }
 
         ViewCompat.getWindowInsetsController(window.decorView)?.let { controller ->
@@ -80,17 +87,14 @@ class FeedActivity : AppCompatActivity() {
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
 
-        // Back Stack Listener (For Sub-fragments like EditProfile/Chats)
         supportFragmentManager.addOnBackStackChangedListener {
             container.post {
                 val current = supportFragmentManager.findFragmentById(R.id.container)
-                // If stack is empty, it means we are on a main tab (activeFragment)
                 updateHeaderVisibility(current ?: activeFragment)
             }
         }
 
         messageIcon.setOnClickListener {
-            // Chats is a sub-screen, so we use replace() to push it on top
             supportFragmentManager.beginTransaction()
                 .replace(R.id.container, ChatsFragment())
                 .addToBackStack(null)
@@ -101,7 +105,6 @@ class FeedActivity : AppCompatActivity() {
             val popup = PopupMenu(this, view)
             popup.menuInflater.inflate(R.menu.main_menu, popup.menu)
             popup.setOnMenuItemClickListener { item ->
-                // Helper to load simple menu fragments
                 fun loadMenuFrag(frag: Fragment) {
                     supportFragmentManager.beginTransaction()
                         .replace(R.id.container, frag)
@@ -119,7 +122,6 @@ class FeedActivity : AppCompatActivity() {
             popup.show()
         }
 
-        // 2. Initial Load: Load FeedFragment directly
         if (savedInstanceState == null) {
             feedFragment = FeedFragment()
             supportFragmentManager.beginTransaction()
@@ -129,7 +131,6 @@ class FeedActivity : AppCompatActivity() {
             updateHeaderVisibility(feedFragment)
         }
 
-        // 3. Updated Bottom Navigation: Use Hide/Show logic
         bottomNav.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_home -> {
@@ -157,16 +158,12 @@ class FeedActivity : AppCompatActivity() {
         }
     }
 
-    // --- NEW FUNCTION: Switches tabs without destroying them ---
     private fun switchTab(targetFragment: Fragment) {
         if (targetFragment == activeFragment) return
 
         val transaction = supportFragmentManager.beginTransaction()
-
-        // Hide the current fragment
         activeFragment?.let { transaction.hide(it) }
 
-        // Show or Add the target fragment
         if (targetFragment.isAdded) {
             transaction.show(targetFragment)
         } else {
@@ -175,8 +172,6 @@ class FeedActivity : AppCompatActivity() {
 
         transaction.commit()
         activeFragment = targetFragment
-
-        // Update header visibility immediately
         container.post { updateHeaderVisibility(targetFragment) }
     }
 
@@ -189,14 +184,21 @@ class FeedActivity : AppCompatActivity() {
             || fragment is LibraryFragment
             || fragment is CampusMapFragment
             || fragment is FacultyMapFragment) {
+
+            // Hide Toolbar
             appBarLayout.setExpanded(true, false)
             appBarLayout.visibility = View.GONE
             topBar.visibility = View.GONE
+
+            // Remove scrolling behavior so content fills the screen
             params.behavior = null
         } else {
+            // Show Toolbar
             appBarLayout.visibility = View.VISIBLE
             topBar.visibility = View.VISIBLE
             appBarLayout.setExpanded(true, true)
+
+            // Re-attach behavior so content sits BELOW toolbar
             params.behavior = AppBarLayout.ScrollingViewBehavior()
         }
         container.requestLayout()

@@ -8,9 +8,12 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.example.myapplication.R
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout // Add this import
+import java.util.*
+import kotlin.collections.HashMap
 
 class FeedFragment : Fragment() {
 
@@ -23,6 +26,7 @@ class FeedFragment : Fragment() {
     private lateinit var adapter: FeedAdapter
     private lateinit var recyclerView: RecyclerView
     private lateinit var layoutManager: LinearLayoutManager
+    private lateinit var swipeRefreshLayout: SwipeRefreshLayout
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -38,6 +42,13 @@ class FeedFragment : Fragment() {
         layoutManager = LinearLayoutManager(requireContext())
         recyclerView.layoutManager = layoutManager
 
+        // 👇 UI FIX: Prevent "Eaten Bottom" by Navigation Bar
+        recyclerView.clipToPadding = false
+        recyclerView.setPadding(0, 0, 0, 250)
+
+        swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout)
+        swipeRefreshLayout.setColorSchemeResources(R.color.purple_500)
+
         recyclerView.post {
             if (view.context == null) return@post
 
@@ -46,12 +57,11 @@ class FeedFragment : Fragment() {
                 adapter = FeedAdapter(feedList, parentWidth)
                 recyclerView.adapter = adapter
 
-                // 1. Add Scroll Listener to detect when scrolling stops
+                // Scroll Listener for Auto-Play
                 recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
                     override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                         super.onScrollStateChanged(recyclerView, newState)
                         if (newState == RecyclerView.SCROLL_STATE_IDLE) {
-                            // Only play video when scrolling stops
                             playVisibleVideo()
                         }
                     }
@@ -62,20 +72,44 @@ class FeedFragment : Fragment() {
                 Log.e(TAG, "RecyclerView width is 0. Cannot initialize adapter.")
             }
         }
-        val swipeRefreshLayout = view.findViewById<SwipeRefreshLayout>(R.id.swipeRefreshLayout)
-
-        // Set the refresh color (optional, matches your app theme)
-        swipeRefreshLayout.setColorSchemeResources(R.color.purple_500) // Or whatever primary color you have
 
         swipeRefreshLayout.setOnRefreshListener {
-            // Call your existing function to reload data
             loadPosts()
         }
     }
 
     private fun loadPosts() {
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+        if (currentUserId == null) return
+
         postsRef = FirebaseDatabase.getInstance().getReference("posts")
-        val postsQuery = postsRef.orderByChild("timestamp")
+        val userInterestsRef = FirebaseDatabase.getInstance().getReference("Users")
+            .child(currentUserId)
+            .child("interests")
+
+        // 1. Fetch Interest Scores
+        userInterestsRef.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(interestSnapshot: DataSnapshot) {
+                val userScores = HashMap<String, Int>()
+
+                for (child in interestSnapshot.children) {
+                    val category = child.key ?: continue
+                    val score = child.getValue(Int::class.java) ?: 0
+                    userScores[category] = score
+                }
+
+                // 2. Fetch & Sort Posts
+                fetchAndSortPosts(userScores)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                fetchAndSortPosts(HashMap())
+            }
+        })
+    }
+
+    private fun fetchAndSortPosts(userScores: HashMap<String, Int>) {
+        val query = postsRef.orderByChild("timestamp")
 
         postsListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -84,84 +118,82 @@ class FeedFragment : Fragment() {
                     val post = child.getValue(FeedItem::class.java)
                     post?.let { feedList.add(it) }
                 }
-                feedList.reverse()
+
+                // 3. Sorting Logic
+                feedList.sortWith(Comparator { p1, p2 ->
+                    val score1 = userScores[p1.category] ?: 0
+                    val score2 = userScores[p2.category] ?: 0
+
+                    if (score1 != score2) {
+                        score2 - score1 // Priority: Interest Score
+                    } else {
+                        p2.timestamp.compareTo(p1.timestamp) // Priority: Time
+                    }
+                })
+
                 if (::adapter.isInitialized) {
                     adapter.notifyDataSetChanged()
-                    // 2. Play the first video automatically when data loads
                     recyclerView.post { playVisibleVideo() }
                 }
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    view?.findViewById<SwipeRefreshLayout>(R.id.swipeRefreshLayout)?.isRefreshing = false
 
-                    // Optional: Show a little toast so they know it worked
-                    // Toast.makeText(context, "Feed Updated", Toast.LENGTH_SHORT).show()
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    swipeRefreshLayout.isRefreshing = false
                 }, 1000)
             }
 
             override fun onCancelled(error: DatabaseError) {
                 Log.w(TAG, "posts listener cancelled: ${error.message}")
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    view?.findViewById<SwipeRefreshLayout>(R.id.swipeRefreshLayout)?.isRefreshing = false
-                }, 1000)
+                swipeRefreshLayout.isRefreshing = false
             }
         }
-        postsQuery.addListenerForSingleValueEvent(postsListener!!)
+        query.addListenerForSingleValueEvent(postsListener!!)
     }
 
-    // --- NEW LOGIC: Play ONLY the single most visible video ---
+    // --- UPDATED: Pass Category to startPlayer ---
     private fun playVisibleVideo() {
         if (!::adapter.isInitialized) return
 
-        // 1. First, pause ALL players to stop the "all playing" issue
         adapter.pauseAllPlayers()
 
-        // 2. Find visible range
         val firstVisible = layoutManager.findFirstVisibleItemPosition()
         val lastVisible = layoutManager.findLastVisibleItemPosition()
 
         if (firstVisible < 0) return
 
-        // 3. Find the "best" item (the one taking up the most screen space)
         var bestPosition = -1
         var maxPercentage = 0
 
         for (i in firstVisible..lastVisible) {
             val view = layoutManager.findViewByPosition(i) ?: continue
 
-            // Calculate how much of the item is actually visible
+            // Calculate visibility percentage
             val location = IntArray(2)
             view.getLocationOnScreen(location)
             val viewTop = location[1]
             val viewBottom = viewTop + view.height
             val screenHeight = resources.displayMetrics.heightPixels
 
-            // Basic visibility check (simplified for stability)
             val visibleTop = maxOf(viewTop, 0)
             val visibleBottom = minOf(viewBottom, screenHeight)
             val visibleHeight = maxOf(0, visibleBottom - visibleTop)
 
             val percentage = if (view.height > 0) (visibleHeight * 100) / view.height else 0
 
-            // If item is more than 50% visible, it's our candidate
             if (percentage >= 50) {
                 bestPosition = i
-                break // Stop at the first mostly visible item (top-down)
+                break
             }
         }
 
-        // 4. Play only that winner
-        if (bestPosition != -1) {
+        if (bestPosition != -1 && bestPosition < feedList.size) {
             val holder = recyclerView.findViewHolderForAdapterPosition(bestPosition)
-            // You might need to cast this if your holder class is named differently
             if (holder is FeedAdapter.FeedViewHolder) {
-                // Ensure your FeedViewHolder has a 'play()' or similar method exposed
-                // If not, you might need to add one or access the player directly if public
-                holder.startPlayer()
+                // 👇 FIX IS HERE: Get category and pass it
+                val category = feedList[bestPosition].category
+                holder.startPlayer(category)
             }
         }
     }
-
-    // --- Lifecycle Fixes ---
 
     override fun onHiddenChanged(hidden: Boolean) {
         super.onHiddenChanged(hidden)
@@ -169,7 +201,6 @@ class FeedFragment : Fragment() {
             if (hidden) {
                 adapter.pauseAllPlayers()
             } else {
-                // CHANGED: Instead of resumeAllPlayers(), verify visibility first
                 playVisibleVideo()
             }
         }
@@ -183,7 +214,6 @@ class FeedFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         if (::adapter.isInitialized && !isHidden) {
-            // CHANGED: Play only visible
             playVisibleVideo()
         }
     }

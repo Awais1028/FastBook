@@ -1,4 +1,4 @@
-package com.example.myapplication.comments // Correct package
+package com.example.myapplication.comments
 
 import android.os.Bundle
 import android.util.Log
@@ -14,16 +14,18 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.myapplication.R
-import com.example.myapplication.comments.Comment // Correct import for your Comment data class
+import com.example.myapplication.comments.Comment
 import com.example.myapplication.comments.CommentAdapter
-import com.example.myapplication.notifications.NotificationItem // Correct import
+import com.example.myapplication.notifications.NotificationItem
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 
 class CommentFragment : Fragment() {
 
     private var postId: String? = null
-    private var postOwnerId: String? = null // Correctly declared here
+    private var postOwnerId: String? = null
+    private var postCategory: String? = null // 👇 NEW: To store category
+
     private lateinit var recyclerView: RecyclerView
     private lateinit var commentAdapter: CommentAdapter
     private val commentList = mutableListOf<Comment>()
@@ -31,9 +33,10 @@ class CommentFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         val view = inflater.inflate(R.layout.fragment_comment, container, false)
 
-        // Get the IDs that were passed from the FeedAdapter
+        // Get the IDs & Category passed from the FeedAdapter
         postId = arguments?.getString("postId")
-        postOwnerId = arguments?.getString("postOwnerId") // Correctly initialized here
+        postOwnerId = arguments?.getString("postOwnerId")
+        postCategory = arguments?.getString("category") // 👇 Grab the category
 
         val toolbar: Toolbar = view.findViewById(R.id.comment_toolbar)
         (activity as AppCompatActivity).setSupportActionBar(toolbar)
@@ -45,6 +48,11 @@ class CommentFragment : Fragment() {
 
         recyclerView = view.findViewById(R.id.recycler_view_comments)
         recyclerView.layoutManager = LinearLayoutManager(context)
+
+        // 👇 UI FIX: Prevent "Eaten Bottom" behind nav bar
+        recyclerView.clipToPadding = false
+        recyclerView.setPadding(0, 0, 0, 250) // Adds padding at bottom
+
         commentAdapter = CommentAdapter(commentList)
         recyclerView.adapter = commentAdapter
 
@@ -80,20 +88,40 @@ class CommentFragment : Fragment() {
             incrementCommentCount()
             val notificationText = "commented: $commentText"
 
-            // --- FIX: Safely call addNotification and log if postOwnerId is null ---
             if (postOwnerId != null) {
                 addNotification(postOwnerId!!, currentUser.uid, notificationText, postId!!)
             } else {
                 Log.e("CommentFragment", "Error: postOwnerId is null. Cannot send notification.")
-                Toast.makeText(context, "Could not send notification: Post owner not found.", Toast.LENGTH_SHORT).show()
+            }
+
+            // 👇 NEW: Add +3 Interest Points for Commenting!
+            if (postCategory != null) {
+                updateUserInterest(currentUser.uid, postCategory!!, 3)
             }
         }
     }
 
-    // This function is now complete and will be called
+    // 👇 NEW: Helper function to update scores (Same as in FeedAdapter)
+    private fun updateUserInterest(userId: String, category: String, points: Int) {
+        if (category == "General" || category.isEmpty()) return
+
+        val interestRef = FirebaseDatabase.getInstance().getReference("Users")
+            .child(userId)
+            .child("interests")
+            .child(category)
+
+        interestRef.runTransaction(object : Transaction.Handler {
+            override fun doTransaction(currentData: MutableData): Transaction.Result {
+                val currentScore = currentData.getValue(Int::class.java) ?: 0
+                currentData.value = currentScore + points
+                return Transaction.success(currentData)
+            }
+            override fun onComplete(error: DatabaseError?, committed: Boolean, currentData: DataSnapshot?) {}
+        })
+    }
+
     private fun addNotification(postOwnerId: String, actorId: String, text: String, postId: String) {
         if (postOwnerId == actorId) {
-            Log.d("CommentFragment", "Not sending notification for self-comment.")
             return
         }
 
@@ -108,12 +136,6 @@ class CommentFragment : Fragment() {
             timestamp = System.currentTimeMillis()
         )
         notifRef.child(notificationId).setValue(notification)
-            .addOnSuccessListener {
-                Log.d("CommentFragment", "Notification sent to $postOwnerId for post $postId")
-            }
-            .addOnFailureListener { e ->
-                Log.e("CommentFragment", "Failed to send notification: ${e.message}", e)
-            }
     }
 
     private fun incrementCommentCount() {
@@ -130,11 +152,7 @@ class CommentFragment : Fragment() {
                 return Transaction.success(currentData)
             }
 
-            override fun onComplete(
-                error: DatabaseError?,
-                committed: Boolean,
-                currentData: DataSnapshot?
-            ) {
+            override fun onComplete(error: DatabaseError?, committed: Boolean, currentData: DataSnapshot?) {
                 if (error != null) {
                     Log.e("CommentFragment", "Failed to increment comment count: ${error.message}")
                 }

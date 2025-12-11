@@ -1,70 +1,97 @@
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp"
-    tools:context=".post.NewPostFragment">
+    android:background="#FFFFFF"
+    android:fillViewport="true">
 
-    <EditText
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:paddingBottom="100dp"> <EditText
         android:id="@+id/postEditText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="What's on your mind?"
-        android:layout_alignParentTop="true" />
+        android:background="@android:color/transparent"
+        android:padding="8dp"
+        android:minHeight="48dp" />
 
-    <FrameLayout
-        android:id="@+id/preview_container"
-        android:layout_width="match_parent"
-        android:layout_height="200dp"
-        android:layout_below="@id/postEditText"
-        android:layout_marginTop="16dp">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Select Category:"
+            android:textStyle="bold"
+            android:textColor="#555" />
 
-        <ImageView
+        <Spinner
+            android:id="@+id/category_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_grey_box"
+            android:spinnerMode="dropdown" />
+        <FrameLayout
+            android:id="@+id/preview_container"
+            android:layout_width="match_parent"
+            android:layout_height="250dp"
+            android:layout_marginTop="16dp"
+            android:background="#F0F0F0"
+            android:visibility="gone"> <ImageView
             android:id="@+id/imagePreview"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:scaleType="centerCrop"
             android:visibility="gone" />
 
-        <VideoView
-            android:id="@+id/videoPreview"
+            <VideoView
+                android:id="@+id/videoPreview"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
+
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/media_buttons_layout"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal">
 
-    </FrameLayout>
+            <Button
+                android:id="@+id/selectImageButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="Add Image"
+                android:backgroundTint="#EEEEEE"
+                android:textColor="#000000"/>
 
-    <LinearLayout
-        android:id="@+id/media_buttons_layout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/preview_container"
-        android:layout_marginTop="16dp"
-        android:orientation="horizontal">
+            <Button
+                android:id="@+id/selectVideoButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Add Video"
+                android:backgroundTint="#EEEEEE"
+                android:textColor="#000000"/>
+        </LinearLayout>
 
         <Button
-            android:id="@+id/selectImageButton"
-            android:layout_width="0dp"
+            android:id="@+id/postButton"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginEnd="8dp"
-            android:text="Select Image"/>
-
-        <Button
-            android:id="@+id/selectVideoButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Select Video"/>
+            android:layout_marginTop="24dp"
+            android:text="Post"
+            android:textSize="16sp"
+            android:padding="12dp"
+            android:backgroundTint="@color/purple_500"/>
 
     </LinearLayout>
-
-    <Button
-        android:id="@+id/postButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Post"
-        android:layout_alignParentBottom="true"
-        android:layout_alignParentEnd="true"/>
-
-</RelativeLayout>
+</ScrollView>
