@@ -89,8 +89,8 @@ class CafeFragment : Fragment() {
 
         return view
     }
+
     override fun onDestroy() {
         super.onDestroy()
-        (activity as? FeedActivity)?.updateNavigationUi(showTopBar = true, showBottomBar = true)
     }
 }

@@ -11,12 +11,14 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.myapplication.R
 import com.example.myapplication.home.FeedAdapter
 import com.example.myapplication.home.FeedItem
+import com.example.myapplication.home.PostDetailFragment
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import de.hdodenhof.circleimageview.CircleImageView // Import this if you use CircleImageView in XML
@@ -37,7 +39,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
     private lateinit var followersLayout: LinearLayout
     private lateinit var followingLayout: LinearLayout
     private lateinit var myPostsRecyclerView: RecyclerView
-    private lateinit var feedAdapter: FeedAdapter
+    private lateinit var gridAdapter: ProfileGridAdapter
     private val postList = mutableListOf<FeedItem>()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -62,14 +64,29 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         followingCount = view.findViewById(R.id.following_count)
         myPostsRecyclerView = view.findViewById(R.id.my_posts_recycler_view)
 
-        // Setup Posts List
-        myPostsRecyclerView.layoutManager = LinearLayoutManager(context)
+        // Setup Posts
+        myPostsRecyclerView.layoutManager = GridLayoutManager(context, 3)
         myPostsRecyclerView.post {
             val parentWidth = myPostsRecyclerView.width
             if (parentWidth > 0) {
-                feedAdapter = FeedAdapter(postList, parentWidth)
-                myPostsRecyclerView.adapter = feedAdapter
+                gridAdapter = ProfileGridAdapter(requireContext(), postList) { post ->
+                    openPostDetail(post.postId)
+                }
+                myPostsRecyclerView.adapter = gridAdapter
                 loadUserPosts()
+
+            }
+        }
+        myPostsRecyclerView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            val spanCount = 3
+            val spacing = resources.displayMetrics.density.toInt() * 2
+            val size = (myPostsRecyclerView.width - spacing) / spanCount
+
+            for (i in 0 until myPostsRecyclerView.childCount) {
+                myPostsRecyclerView.getChildAt(i)?.layoutParams?.apply {
+                    height = size
+                    width = size
+                }
             }
         }
 
@@ -106,6 +123,19 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         // Load Data
         loadUserInfo()
         getFollowerAndFollowingCount()
+    }
+    private fun openPostDetail(postId: String?) {
+        if (postId == null) return
+
+        val fragment = PostDetailFragment()
+        val args = Bundle()
+        args.putString("postId", postId)
+        fragment.arguments = args
+
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.container, fragment)
+            .addToBackStack(null)
+            .commit()
     }
 
     private fun loadUserInfo() {
@@ -182,16 +212,14 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
                     post?.let { postList.add(it) }
                 }
                 postList.reverse()
-                if (::feedAdapter.isInitialized) feedAdapter.notifyDataSetChanged()
+                if (::gridAdapter.isInitialized) {
+                    gridAdapter.notifyDataSetChanged()
+                }
+
             }
             override fun onCancelled(error: DatabaseError) {}
         })
     }
-
-    override fun onPause() { super.onPause(); if (::feedAdapter.isInitialized) feedAdapter.pauseAllPlayers() }
-    override fun onResume() { super.onResume(); if (::feedAdapter.isInitialized) feedAdapter.resumeAllPlayers() }
-    override fun onDestroyView() { super.onDestroyView(); if (::feedAdapter.isInitialized) feedAdapter.releaseAllPlayers() }
-
     private fun followUser() {
         if (currentUserId == null || profileUserId == null) return
         FirebaseDatabase.getInstance().getReference("Users").child(currentUserId!!).child("following").child(profileUserId!!).setValue(true)

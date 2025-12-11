@@ -13,6 +13,9 @@ import com.example.myapplication.chats.ChatsAdapter
 import com.example.myapplication.chats.Chat
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
+import android.widget.TextView
+import com.bumptech.glide.Glide
+import de.hdodenhof.circleimageview.CircleImageView
 
 class MessageChatActivity : AppCompatActivity() {
 
@@ -31,6 +34,31 @@ class MessageChatActivity : AppCompatActivity() {
 
         val toolbar: Toolbar = findViewById(R.id.toolbar_chat)
         setSupportActionBar(toolbar)
+        val headerImage = findViewById<CircleImageView>(R.id.chat_profile_image)
+        val headerName = findViewById<TextView>(R.id.chat_username)
+
+        FirebaseDatabase.getInstance()
+            .reference.child("Users").child(userIdVisit!!)
+            .addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val name = snapshot.child("fullName").getValue(String::class.java) ?: "User"
+                    val img = snapshot.child("profileImageUrl").getValue(String::class.java) ?: ""
+
+                    headerName.text = name
+
+                    if (img.isNotEmpty()) {
+                        Glide.with(this@MessageChatActivity)
+                            .load(img)
+                            .placeholder(R.drawable.ic_profile)
+                            .into(headerImage)
+                    } else {
+                        headerImage.setImageResource(R.drawable.ic_profile)
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {}
+            })
+
         supportActionBar!!.title = "" // We can set the username here later
         supportActionBar!!.setDisplayHomeAsUpEnabled(true)
         toolbar.setNavigationOnClickListener { finish() }
@@ -66,6 +94,7 @@ class MessageChatActivity : AppCompatActivity() {
         messageHashMap["message"] = message
         messageHashMap["isseen"] = false
         messageHashMap["url"] = ""
+        messageHashMap["timestamp"] = System.currentTimeMillis()
 
         reference.child("Chats").child(messageKey!!).setValue(messageHashMap)
             .addOnCompleteListener { task ->

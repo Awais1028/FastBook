@@ -89,10 +89,10 @@ class FeedActivity : AppCompatActivity() {
 
         supportFragmentManager.addOnBackStackChangedListener {
             container.post {
-                val current = supportFragmentManager.findFragmentById(R.id.container)
-                updateHeaderVisibility(current ?: activeFragment)
+                updateHeaderVisibility(getVisibleFragment())
             }
         }
+
 
         messageIcon.setOnClickListener {
             supportFragmentManager.beginTransaction()
@@ -158,14 +158,9 @@ class FeedActivity : AppCompatActivity() {
         }
         // In onCreate()
 
-        supportFragmentManager.registerFragmentLifecycleCallbacks(object : FragmentManager.FragmentLifecycleCallbacks() {
-            // CHANGE THIS from onFragmentViewCreated to onFragmentResumed
-            override fun onFragmentResumed(fm: FragmentManager, f: Fragment) {
-                super.onFragmentResumed(fm, f)
-                updateHeaderVisibility(f)
-            }
-        }, true)
-
+    }
+    private fun getVisibleFragment(): Fragment? {
+        return supportFragmentManager.fragments.lastOrNull { it != null && it.isVisible }
     }
 
     private fun switchTab(targetFragment: Fragment) {
@@ -174,16 +169,16 @@ class FeedActivity : AppCompatActivity() {
         val transaction = supportFragmentManager.beginTransaction()
         activeFragment?.let { transaction.hide(it) }
 
-        if (targetFragment.isAdded) {
-            transaction.show(targetFragment)
-        } else {
-            transaction.add(R.id.container, targetFragment)
-        }
+        if (targetFragment.isAdded) transaction.show(targetFragment)
+        else transaction.add(R.id.container, targetFragment)
 
+        transaction.runOnCommit {
+            activeFragment = targetFragment
+            updateHeaderVisibility(getVisibleFragment())
+        }
         transaction.commit()
-        activeFragment = targetFragment
-        container.post { updateHeaderVisibility(targetFragment) }
     }
+
 
     // Inside FeedActivity.kt
 

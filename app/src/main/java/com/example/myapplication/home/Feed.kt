@@ -238,7 +238,6 @@ class FeedFragment : Fragment() {
 
         // 1. Set UI Bars (Top: ON, Bottom: ON)
         // This replaces the manual bottomNav.visibility code
-        (activity as? FeedActivity)?.updateNavigationUi(showTopBar = true, showBottomBar = true)
 
         // 2. Fix the "Half Screen" bug
         view?.requestLayout()
