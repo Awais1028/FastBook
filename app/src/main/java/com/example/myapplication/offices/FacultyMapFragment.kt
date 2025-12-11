@@ -116,4 +116,10 @@ class FacultyMapFragment : Fragment() {
             }
         }
     }
+    override fun onDestroyView() {
+        super.onDestroyView()
+        // Force hide keyboard so it doesn't mess up the next screen
+        val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+        imm.hideSoftInputFromWindow(view?.windowToken, 0)
+    }
 }

@@ -15,10 +15,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MyApplication"
         tools:targetApi="31">
+
         <activity
             android:name=".home.FeedActivity"
             android:exported="false"
-            android:theme="@style/Theme.MyApplication3" />
+            android:theme="@style/Theme.MyApplication3"
+            android:windowSoftInputMode="stateVisible|adjustResize" />
+
         <activity
             android:name=".auth.ChangePasswordActivity"
             android:exported="false"
@@ -39,9 +42,12 @@
             android:name=".auth.SignInScreen"
             android:exported="false"
             android:theme="@style/Theme.MyApplication3" />
+
         <activity
             android:name=".chats.MessageChatActivity"
-            android:theme="@style/Theme.MyApplication2"/>
+            android:theme="@style/Theme.MyApplication2"
+            android:windowSoftInputMode="stateVisible|adjustResize"/>
+
         <activity
             android:name=".splash.SplashActivity"
             android:exported="true"
@@ -51,7 +57,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".home.MainActivity" />
+
+        <activity
+            android:name=".home.MainActivity"
+            android:windowSoftInputMode="stateVisible|adjustResize" />
+
     </application>
 
 </manifest>

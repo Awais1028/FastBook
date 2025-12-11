@@ -183,7 +183,8 @@ class FeedActivity : AppCompatActivity() {
             || fragment is CafeFragment
             || fragment is LibraryFragment
             || fragment is CampusMapFragment
-            || fragment is FacultyMapFragment) {
+            || fragment is FacultyMapFragment
+            || fragment is NewPostFragment) {
 
             // Hide Toolbar
             appBarLayout.setExpanded(true, false)

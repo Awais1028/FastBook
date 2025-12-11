@@ -22,8 +22,6 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
-import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.StorageReference
 
 class NewPostFragment : Fragment() {
 
@@ -33,8 +31,6 @@ class NewPostFragment : Fragment() {
     private lateinit var selectImageButton: Button
     private lateinit var videoPreview: VideoView
     private lateinit var imagePreview: ImageView
-
-    // 👇 NEW: Spinner for Category
     private lateinit var categorySpinner: Spinner
 
     private var videoUri: Uri? = null
@@ -48,9 +44,10 @@ class NewPostFragment : Fragment() {
             imageUri = null
             getImageDimensions(Uri.EMPTY)
             getVideoDimensions(uri)
-            videoPreview.setVideoURI(videoUri)
+            view?.findViewById<View>(R.id.preview_container)?.visibility = View.VISIBLE
             videoPreview.visibility = View.VISIBLE
             imagePreview.visibility = View.GONE
+            videoPreview.setVideoURI(videoUri)
             videoPreview.start()
         }
     }
@@ -61,6 +58,7 @@ class NewPostFragment : Fragment() {
             videoUri = null
             getVideoDimensions(Uri.EMPTY)
             getImageDimensions(uri)
+            view?.findViewById<View>(R.id.preview_container)?.visibility = View.VISIBLE
             imagePreview.setImageURI(imageUri)
             imagePreview.visibility = View.VISIBLE
             videoPreview.visibility = View.GONE
@@ -70,15 +68,20 @@ class NewPostFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         val view = inflater.inflate(R.layout.fragment_new_post, container, false)
 
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(view) { v, insets ->
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            v.setPadding(v.paddingLeft, bars.top, v.paddingRight, v.paddingBottom)
+            androidx.core.view.WindowInsetsCompat.CONSUMED
+        }
+
         postEditText = view.findViewById(R.id.postEditText)
         postButton = view.findViewById(R.id.postButton)
         selectVideoButton = view.findViewById(R.id.selectVideoButton)
         selectImageButton = view.findViewById(R.id.selectImageButton)
         videoPreview = view.findViewById(R.id.videoPreview)
         imagePreview = view.findViewById(R.id.imagePreview)
-        categorySpinner = view.findViewById(R.id.category_spinner) // Link to XML
+        categorySpinner = view.findViewById(R.id.category_spinner)
 
-        // 👇 1. Setup Category Spinner
         val categories = arrayOf("General", "Education", "Sports", "Cafe/Food", "Events", "Memes", "Tech")
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, categories)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
@@ -89,7 +92,6 @@ class NewPostFragment : Fragment() {
 
         postButton.setOnClickListener {
             val content = postEditText.text.toString().trim()
-            // 👇 Get Selected Category
             val selectedCategory = categorySpinner.selectedItem.toString()
 
             if (content.isEmpty() && videoUri == null && imageUri == null) {
@@ -97,14 +99,116 @@ class NewPostFragment : Fragment() {
                 return@setOnClickListener
             }
 
-            // 👇 Pass category to upload functions
             when {
                 videoUri != null -> uploadVideoToCloudinary(content, selectedCategory)
-                imageUri != null -> uploadImageToFirebaseStorage(content, selectedCategory)
+                imageUri != null -> uploadImageToCloudinary(content, selectedCategory) // 👈 CHANGED TO CLOUDINARY
                 else -> savePostToFirebase(content, selectedCategory, null, null, 0, 0)
             }
         }
         return view
+    }
+
+    // --- 👇 NEW CLOUDINARY IMAGE UPLOAD (REPLACES FIREBASE STORAGE) ---
+    private fun uploadImageToCloudinary(postText: String, category: String) {
+        val progressDialog = ProgressDialog(requireContext()).apply {
+            setMessage("Uploading image...")
+            setCancelable(false)
+            show()
+        }
+
+        MediaManager.get().upload(imageUri)
+            .option("resource_type", "image") // Explicitly set type to image
+            .callback(object : UploadCallback {
+                override fun onSuccess(requestId: String, resultData: Map<*, *>?) {
+                    progressDialog.dismiss()
+                    val imageUrl = resultData?.get("secure_url") as String
+                    // Save to DB with the new Cloudinary URL
+                    savePostToFirebase(postText, category, imageUrl, null, mediaWidth, mediaHeight)
+                }
+
+                override fun onError(requestId: String, error: ErrorInfo) {
+                    progressDialog.dismiss()
+                    Toast.makeText(requireContext(), "Image upload failed: ${error.description}", Toast.LENGTH_SHORT).show()
+                }
+                override fun onStart(requestId: String) { }
+                override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) { }
+                override fun onReschedule(requestId: String, error: ErrorInfo) { }
+            }).dispatch()
+    }
+
+    private fun uploadVideoToCloudinary(postText: String, category: String) {
+        val progressDialog = ProgressDialog(requireContext()).apply {
+            setMessage("Uploading video...")
+            setCancelable(false)
+            show()
+        }
+
+        MediaManager.get().upload(videoUri).option("resource_type", "video")
+            .callback(object : UploadCallback {
+                override fun onSuccess(requestId: String, resultData: Map<*, *>?) {
+                    progressDialog.dismiss()
+                    val videoUrl = resultData?.get("secure_url") as String
+                    savePostToFirebase(postText, category, null, videoUrl, mediaWidth, mediaHeight)
+                }
+
+                override fun onError(requestId: String, error: ErrorInfo) {
+                    progressDialog.dismiss()
+                    Toast.makeText(requireContext(), "Video upload failed: ${error.description}", Toast.LENGTH_SHORT).show()
+                }
+                override fun onStart(requestId: String) { }
+                override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) { }
+                override fun onReschedule(requestId: String, error: ErrorInfo) { }
+            }).dispatch()
+    }
+
+    private fun savePostToFirebase(postText: String, category: String, imageUrl: String?, videoUrl: String?, width: Int, height: Int) {
+        val firebaseUser = FirebaseAuth.getInstance().currentUser ?: return
+        val currentUserId = firebaseUser.uid
+        val userRef = FirebaseDatabase.getInstance().getReference("Users").child(currentUserId)
+
+        userRef.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val userName = snapshot.child("fullName").getValue(String::class.java) ?: "User"
+                // Get profile pic of the publisher (optional, but good for feed)
+                val userProfilePic = snapshot.child("profileImageUrl").getValue(String::class.java)
+
+                val postsRef = FirebaseDatabase.getInstance().getReference("posts")
+                val postId = postsRef.push().key ?: return
+
+                val post = FeedItem(
+                    postId = postId,
+                    publisher = currentUserId,
+                    userName = userName,
+                    postText = postText,
+                    postImageUrl = imageUrl,
+                    postVideoUrl = videoUrl,
+                    timestamp = System.currentTimeMillis(),
+                    mediaWidth = width,
+                    mediaHeight = height,
+                    category = category
+                    // If your FeedItem has a publisherImageUrl field, add 'userProfilePic' here
+                )
+
+                postsRef.child(postId).setValue(post).addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        Toast.makeText(requireContext(), "Post published successfully!", Toast.LENGTH_SHORT).show()
+                        postEditText.text.clear()
+                        view?.findViewById<View>(R.id.preview_container)?.visibility = View.GONE
+                        videoPreview.visibility = View.GONE
+                        imagePreview.visibility = View.GONE
+                        videoUri = null
+                        imageUri = null
+                        mediaWidth = 0
+                        mediaHeight = 0
+                    } else {
+                        Toast.makeText(requireContext(), "Failed to publish post.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {
+                Toast.makeText(requireContext(), "Could not fetch user data.", Toast.LENGTH_SHORT).show()
+            }
+        })
     }
 
     private fun getImageDimensions(uri: Uri) {
@@ -138,99 +242,14 @@ class NewPostFragment : Fragment() {
         }
     }
 
-    private fun uploadVideoToCloudinary(postText: String, category: String) {
-        val progressDialog = ProgressDialog(requireContext()).apply {
-            setMessage("Uploading video...")
-            setCancelable(false)
-            show()
-        }
-
-        MediaManager.get().upload(videoUri).option("resource_type", "video")
-            .callback(object : UploadCallback {
-                override fun onSuccess(requestId: String, resultData: Map<*, *>?) {
-                    progressDialog.dismiss()
-                    val videoUrl = resultData?.get("secure_url") as String
-                    // 👇 Pass category
-                    savePostToFirebase(postText, category, null, videoUrl, mediaWidth, mediaHeight)
-                }
-
-                override fun onError(requestId: String, error: ErrorInfo) {
-                    progressDialog.dismiss()
-                    Toast.makeText(requireContext(), "Video upload failed: ${error.description}", Toast.LENGTH_SHORT).show()
-                }
-                override fun onStart(requestId: String) { }
-                override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) { }
-                override fun onReschedule(requestId: String, error: ErrorInfo) { }
-            }).dispatch()
+    // Keep the Nav Bar Hiding Logic
+    override fun onResume() {
+        super.onResume()
+        requireActivity().findViewById<android.view.View>(R.id.bottom_navigation)?.visibility = android.view.View.GONE
     }
 
-    private fun uploadImageToFirebaseStorage(postText: String, category: String) {
-        val progressDialog = ProgressDialog(requireContext()).apply {
-            setMessage("Publishing post...")
-            setCancelable(false)
-            show()
-        }
-
-        val storageRef: StorageReference = FirebaseStorage.getInstance().reference.child("Post Pictures")
-        val fileRef = storageRef.child("${System.currentTimeMillis()}.jpg")
-
-        fileRef.putFile(imageUri!!)
-            .addOnSuccessListener { taskSnapshot ->
-                taskSnapshot.storage.downloadUrl.addOnSuccessListener { uri ->
-                    progressDialog.dismiss()
-                    val imageUrl = uri.toString()
-                    // 👇 Pass category
-                    savePostToFirebase(postText, category, imageUrl, null, mediaWidth, mediaHeight)
-                }
-            }
-            .addOnFailureListener { e ->
-                progressDialog.dismiss()
-                Toast.makeText(requireContext(), "Image upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-    }
-
-    private fun savePostToFirebase(postText: String, category: String, imageUrl: String?, videoUrl: String?, width: Int, height: Int) {
-        val firebaseUser = FirebaseAuth.getInstance().currentUser ?: return
-        val currentUserId = firebaseUser.uid
-        val userRef = FirebaseDatabase.getInstance().getReference("Users").child(currentUserId)
-
-        userRef.addListenerForSingleValueEvent(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val userName = snapshot.child("fullName").getValue(String::class.java) ?: "User"
-                val postsRef = FirebaseDatabase.getInstance().getReference("posts")
-                val postId = postsRef.push().key ?: return
-
-                val post = FeedItem(
-                    postId = postId,
-                    publisher = currentUserId,
-                    userName = userName,
-                    postText = postText,
-                    postImageUrl = imageUrl,
-                    postVideoUrl = videoUrl,
-                    timestamp = System.currentTimeMillis(),
-                    mediaWidth = width,
-                    mediaHeight = height,
-                    category = category // ✅ SAVED TO FIREBASE
-                )
-
-                postsRef.child(postId).setValue(post).addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
-                        Toast.makeText(requireContext(), "Post published successfully!", Toast.LENGTH_SHORT).show()
-                        postEditText.text.clear()
-                        videoPreview.visibility = View.GONE
-                        imagePreview.visibility = View.GONE
-                        videoUri = null
-                        imageUri = null
-                        mediaWidth = 0
-                        mediaHeight = 0
-                    } else {
-                        Toast.makeText(requireContext(), "Failed to publish post.", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-            override fun onCancelled(error: DatabaseError) {
-                Toast.makeText(requireContext(), "Could not fetch user data.", Toast.LENGTH_SHORT).show()
-            }
-        })
+    override fun onDestroyView() {
+        super.onDestroyView()
+        requireActivity().findViewById<android.view.View>(R.id.bottom_navigation)?.visibility = android.view.View.VISIBLE
     }
 }

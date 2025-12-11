@@ -213,6 +213,11 @@ class FeedFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        val bottomNav = requireActivity().findViewById<android.view.View>(R.id.bottom_navigation)
+        bottomNav?.visibility = android.view.View.VISIBLE
+
+        // 2. Optional: Fix the "Half Screen" bug by requesting a layout update
+        view?.requestLayout()
         if (::adapter.isInitialized && !isHidden) {
             playVisibleVideo()
         }

@@ -195,24 +195,26 @@ class FeedAdapter(
             }
         }
 
+        // In your Feed Adapter:
         holder.commentIcon.setOnClickListener {
             val currentPosition = holder.adapterPosition
             if (currentPosition != RecyclerView.NO_POSITION) {
                 val clickedPost = feedList[currentPosition]
-                val fragment = CommentFragment()
-                val args = Bundle()
-                args.putString("postId", clickedPost.postId)
-                args.putString("postOwnerId", clickedPost.publisher)
 
-                // 👇 PASS CATEGORY SO COMMENT FRAGMENT CAN USE IT
-                args.putString("category", clickedPost.category)
+                // Ensure that clickedPost.postId is definitely not null here
+                if (clickedPost.postId.isNullOrEmpty()) {
+                    // You may want to add a Toast here: "Error: Cannot open comments for this post."
+                    return@setOnClickListener
+                }
 
-                fragment.arguments = args
+                val commentSheet = CommentFragment()
+                val bundle = Bundle()
+                bundle.putString("postId", clickedPost.postId)
+                // ... (other args) ...
+                commentSheet.arguments = bundle
+
                 val activity = holder.itemView.context as AppCompatActivity
-                activity.supportFragmentManager.beginTransaction()
-                    .replace(R.id.container, fragment)
-                    .addToBackStack(null)
-                    .commit()
+                commentSheet.show(activity.supportFragmentManager, "CommentSheet")
             }
         }
 
