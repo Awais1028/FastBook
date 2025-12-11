@@ -25,6 +25,8 @@ class CommentFragment : BottomSheetDialogFragment() {
     private var postId: String? = null
     private var postOwnerId: String? = null
     private var postCategory: String? = null
+    // 👇 NEW: Variable to track count locally
+    private var currentCommentCount: Int = 0
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var commentAdapter: CommentAdapter
@@ -40,7 +42,11 @@ class CommentFragment : BottomSheetDialogFragment() {
         postId = arguments?.getString("postId")
         postOwnerId = arguments?.getString("postOwnerId")
         postCategory = arguments?.getString("category")
-        Log.d("CommentDebug", "onCreate: Retrieved Post ID: $postId")
+
+        // 👇 NEW: Get the starting count passed from FeedAdapter
+        currentCommentCount = arguments?.getInt("commentCount", 0) ?: 0
+
+        Log.d("CommentDebug", "onCreate: Retrieved Post ID: $postId, Start Count: $currentCommentCount")
     }
 
     // --- 2. SET UP BOTTOM SHEET BEHAVIOR ---
@@ -119,7 +125,20 @@ class CommentFragment : BottomSheetDialogFragment() {
             timestamp = System.currentTimeMillis()
         )
         commentsRef.child(commentId).setValue(comment).addOnSuccessListener {
+            // 1. Update Database Count
             incrementCommentCount()
+
+            // 2. 👇 NEW: Update Local Count & Send to Feed
+            currentCommentCount++
+
+            val result = Bundle().apply {
+                putString("updatedPostId", postId)
+                putInt("newCommentCount", currentCommentCount)
+            }
+            // This sends the signal back to FeedFragment instantly
+            parentFragmentManager.setFragmentResult("post_update", result)
+
+
             val notificationText = "commented: $commentText"
 
             if (postOwnerId != null) {
@@ -131,36 +150,20 @@ class CommentFragment : BottomSheetDialogFragment() {
         }
     }
 
-    // 2. Original Load Comments (Working Syntax Restored)
-    // In CommentFragment.kt
-
     private fun loadComments() {
         val currentPostId = postId // No '!!' here, we'll check it below
 
-        // --- 1. DUMMY DATA INJECTION (FOR TESTING) ---
-        // If the RecyclerView displays these three, the layout and adapter are working.
-        commentList.add(Comment(commentId = "dummy1", comment = "Dummy Comment 1 (Test Load)", publisher = "TestUser1", timestamp = System.currentTimeMillis() - 120000))
-        commentList.add(Comment(commentId = "dummy2", comment = "Dummy Comment 2 (Test Load)", publisher = "TestUser2", timestamp = System.currentTimeMillis() - 60000))
-        commentList.add(Comment(commentId = "dummy3", comment = "Dummy Comment 3 (Test Load)", publisher = "TestUser3", timestamp = System.currentTimeMillis()))
-        commentAdapter.notifyDataSetChanged()
-        Log.d("CommentDebug", "Dummy data injected. Adapter notified.")
+        // --- 1. DUMMY DATA INJECTION REMOVED FOR CLEANER PROD CODE ---
 
         if (currentPostId.isNullOrEmpty()) {
             Log.e("CommentDebug", "Cannot attach Firebase listener: Post ID is null.")
             return
         }
 
-        // --- 2. ACTUAL FIREBASE LISTENER ATTACHMENT ---
-        // We clear the list inside the listener, so the dummy data will disappear
-        // when the real data arrives, which is normal.
-
-        // Using postId!! here because we checked it above and we rely on the working syntax
         val commentsRef = FirebaseDatabase.getInstance().getReference("Comments").child(postId!!)
 
         commentsRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-
-                // 🔴 CRITICAL: The error is in the parsing or binding inside this block.
                 try {
                     commentList.clear() // Clear dummy and old data
                     for (commentSnapshot in snapshot.children) {
@@ -168,7 +171,6 @@ class CommentFragment : BottomSheetDialogFragment() {
                         comment?.let { commentList.add(it) }
                     }
                     commentAdapter.notifyDataSetChanged()
-                    Log.d("CommentDebug", "Firebase LOAD Success: Added ${commentList.size} real comments.")
 
                     if (commentList.isNotEmpty()) {
                         recyclerView.post {
@@ -187,9 +189,34 @@ class CommentFragment : BottomSheetDialogFragment() {
             }
         })
     }
+
     // --- Keep existing helper functions ---
-    private fun updateUserInterest(userId: String, category: String, points: Int) { /* Logic omitted for brevity */ }
-    private fun addNotification(postOwnerId: String, actorId: String, text: String, postId: String) { /* Logic omitted for brevity */ }
+    private fun updateUserInterest(userId: String, category: String, points: Int) {
+        if (category == "General" || category.isEmpty()) return
+
+        val interestRef = FirebaseDatabase.getInstance().getReference("Users")
+            .child(userId)
+            .child("interests")
+            .child(category)
+
+        interestRef.runTransaction(object : Transaction.Handler {
+            override fun doTransaction(currentData: MutableData): Transaction.Result {
+                val currentScore = currentData.getValue(Int::class.java) ?: 0
+                currentData.value = currentScore + points
+                return Transaction.success(currentData)
+            }
+            override fun onComplete(error: DatabaseError?, committed: Boolean, currentData: DataSnapshot?) {}
+        })
+    }
+
+    private fun addNotification(postOwnerId: String, actorId: String, text: String, postId: String) {
+        if (postOwnerId == actorId) return
+        val notifRef = FirebaseDatabase.getInstance().getReference("Notifications").child(postOwnerId)
+        val notificationId = notifRef.push().key ?: return
+        val notification = NotificationItem(notificationId, actorId, text, postId, System.currentTimeMillis())
+        notifRef.child(notificationId).setValue(notification)
+    }
+
     private fun incrementCommentCount() {
         val currentPostId = postId ?: return
         val postRef = FirebaseDatabase.getInstance().getReference("posts").child(currentPostId)
@@ -211,4 +238,6 @@ class CommentFragment : BottomSheetDialogFragment() {
             }
         })
     }
+
+
 }

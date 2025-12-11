@@ -11,6 +11,7 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.myapplication.R
+import com.example.myapplication.home.FeedActivity
 
 class CafeFragment : Fragment() {
 
@@ -87,5 +88,9 @@ class CafeFragment : Fragment() {
         recyclerView.adapter = cafeMenuAdapter
 
         return view
+    }
+    override fun onDestroy() {
+        super.onDestroy()
+        (activity as? FeedActivity)?.updateNavigationUi(showTopBar = true, showBottomBar = true)
     }
 }

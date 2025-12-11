@@ -14,6 +14,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
 import com.example.myapplication.R
 import com.example.myapplication.cafe.CafeFragment
 import com.example.myapplication.chats.ChatsFragment
@@ -33,7 +34,6 @@ class FeedActivity : AppCompatActivity() {
     private lateinit var topBar: View
     private lateinit var container: FrameLayout
     private lateinit var bottomNav: BottomNavigationView
-
     private var feedFragment: Fragment? = null
     private var profileFragment: Fragment? = null
     private var notificationFragment: Fragment? = null
@@ -156,6 +156,16 @@ class FeedActivity : AppCompatActivity() {
                 else -> false
             }
         }
+        // In onCreate()
+
+        supportFragmentManager.registerFragmentLifecycleCallbacks(object : FragmentManager.FragmentLifecycleCallbacks() {
+            // CHANGE THIS from onFragmentViewCreated to onFragmentResumed
+            override fun onFragmentResumed(fm: FragmentManager, f: Fragment) {
+                super.onFragmentResumed(fm, f)
+                updateHeaderVisibility(f)
+            }
+        }, true)
+
     }
 
     private fun switchTab(targetFragment: Fragment) {
@@ -175,33 +185,69 @@ class FeedActivity : AppCompatActivity() {
         container.post { updateHeaderVisibility(targetFragment) }
     }
 
+    // Inside FeedActivity.kt
+
     private fun updateHeaderVisibility(fragment: Fragment?) {
         val params = container.layoutParams as CoordinatorLayout.LayoutParams
 
-        if (fragment is ProfileFragment
-            || fragment is EditProfileFragment
-            || fragment is CafeFragment
-            || fragment is LibraryFragment
-            || fragment is CampusMapFragment
-            || fragment is FacultyMapFragment
-            || fragment is NewPostFragment) {
-
-            // Hide Toolbar
-            appBarLayout.setExpanded(true, false)
-            appBarLayout.visibility = View.GONE
-            topBar.visibility = View.GONE
-
-            // Remove scrolling behavior so content fills the screen
-            params.behavior = null
-        } else {
-            // Show Toolbar
+        // 1. FEED: Needs BOTH
+        if (fragment is FeedFragment) {
+            // A. Make them Visible FIRST
             appBarLayout.visibility = View.VISIBLE
             topBar.visibility = View.VISIBLE
-            appBarLayout.setExpanded(true, true)
+            bottomNav.visibility = View.VISIBLE
 
-            // Re-attach behavior so content sits BELOW toolbar
+            // B. Re-attach the scrolling behavior
             params.behavior = AppBarLayout.ScrollingViewBehavior()
+
+            // C. Force Expansion AFTER the view is confirmed visible
+            appBarLayout.post {
+                appBarLayout.setExpanded(true, false)
+            }
         }
+        // 2. BOTTOM ONLY (Profile, NewPost, Notification)
+        else if (fragment is ProfileFragment
+            || fragment is NewPostFragment
+            || fragment is NotificationFragment) {
+
+            appBarLayout.setExpanded(false, false) // Collapse it
+            appBarLayout.visibility = View.GONE
+            topBar.visibility = View.GONE
+            bottomNav.visibility = View.VISIBLE
+
+            params.behavior = null
+        }
+        // 3. NONE (Cafe, Library, Maps, EditProfile)
+        else {
+            appBarLayout.setExpanded(false, false) // Collapse it
+            appBarLayout.visibility = View.GONE
+            topBar.visibility = View.GONE
+            bottomNav.visibility = View.GONE
+
+            params.behavior = null
+        }
+
         container.requestLayout()
+    }
+    fun updateNavigationUi(showTopBar: Boolean, showBottomBar: Boolean) {
+        // 1. Handle Bottom Navigation
+        val bottomNav = findViewById<View>(R.id.bottom_navigation)
+        if (showBottomBar) {
+            bottomNav.visibility = View.VISIBLE
+        } else {
+            bottomNav.visibility = View.GONE
+        }
+
+        // 2. Handle Top Bar (Toolbar)
+        // If you use setSupportActionBar(toolbar):
+        if (showTopBar) {
+            supportActionBar?.show()
+        } else {
+            supportActionBar?.hide()
+        }
+
+        // NOTE: If you are NOT using supportActionBar but a raw <Toolbar> in XML with an ID:
+        // val toolbar = findViewById<View>(R.id.your_toolbar_id)
+        // toolbar.visibility = if (showTopBar) View.VISIBLE else View.GONE
     }
 }

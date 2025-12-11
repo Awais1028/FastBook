@@ -18,6 +18,7 @@ import de.hdodenhof.circleimageview.CircleImageView
 import com.cloudinary.android.MediaManager // Import Cloudinary
 import com.cloudinary.android.callback.ErrorInfo
 import com.cloudinary.android.callback.UploadCallback
+import com.example.myapplication.home.FeedActivity
 
 class EditProfileFragment : Fragment(R.layout.fragment_edit_profile) {
 

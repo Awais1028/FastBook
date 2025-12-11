@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.setFragmentResultListener // Import this
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -48,6 +49,27 @@ class FeedFragment : Fragment() {
 
         swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout)
         swipeRefreshLayout.setColorSchemeResources(R.color.purple_500)
+
+        // 👇 NEW CODE: Listen for updates from CommentsFragment
+        setFragmentResultListener("post_update") { _, bundle ->
+            val updatedPostId = bundle.getString("updatedPostId")
+            val newCount = bundle.getInt("newCommentCount")
+
+            if (updatedPostId != null) {
+                // Find the post in our current list
+                val index = feedList.indexOfFirst { it.postId == updatedPostId }
+                if (index != -1) {
+                    // Update the local list
+                    // NOTE: using .copy() assuming FeedItem is a data class with val fields
+                    feedList[index] = feedList[index].copy(commentCount = newCount)
+
+                    // Notify adapter to redraw just this row (no screen flicker)
+                    if (::adapter.isInitialized) {
+                        adapter.notifyItemChanged(index)
+                    }
+                }
+            }
+        }
 
         recyclerView.post {
             if (view.context == null) return@post
@@ -213,11 +235,15 @@ class FeedFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        val bottomNav = requireActivity().findViewById<android.view.View>(R.id.bottom_navigation)
-        bottomNav?.visibility = android.view.View.VISIBLE
 
-        // 2. Optional: Fix the "Half Screen" bug by requesting a layout update
+        // 1. Set UI Bars (Top: ON, Bottom: ON)
+        // This replaces the manual bottomNav.visibility code
+        (activity as? FeedActivity)?.updateNavigationUi(showTopBar = true, showBottomBar = true)
+
+        // 2. Fix the "Half Screen" bug
         view?.requestLayout()
+
+        // 3. Resume Video Playback
         if (::adapter.isInitialized && !isHidden) {
             playVisibleVideo()
         }

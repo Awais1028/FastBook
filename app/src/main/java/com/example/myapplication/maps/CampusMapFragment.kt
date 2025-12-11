@@ -9,6 +9,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import com.example.myapplication.R
+import com.example.myapplication.home.FeedActivity
 
 class CampusMapFragment : Fragment() {
 

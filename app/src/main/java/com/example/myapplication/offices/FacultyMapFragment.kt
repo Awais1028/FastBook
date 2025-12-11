@@ -13,6 +13,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import com.example.myapplication.R
+import com.example.myapplication.home.FeedActivity
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -121,5 +122,9 @@ class FacultyMapFragment : Fragment() {
         // Force hide keyboard so it doesn't mess up the next screen
         val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
         imm.hideSoftInputFromWindow(view?.windowToken, 0)
+    }
+    override fun onDestroy() {
+        super.onDestroy()
+        (activity as? FeedActivity)?.updateNavigationUi(showTopBar = true, showBottomBar = true)
     }
 }

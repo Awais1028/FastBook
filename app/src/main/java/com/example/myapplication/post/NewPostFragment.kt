@@ -11,11 +11,15 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import com.cloudinary.android.MediaManager
 import com.cloudinary.android.callback.ErrorInfo
 import com.cloudinary.android.callback.UploadCallback
 import com.example.myapplication.R
+import com.example.myapplication.home.FeedActivity
 import com.example.myapplication.home.FeedItem
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
@@ -38,6 +42,7 @@ class NewPostFragment : Fragment() {
     private var mediaWidth: Int = 0
     private var mediaHeight: Int = 0
 
+    // Launchers
     private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             videoUri = uri
@@ -66,14 +71,24 @@ class NewPostFragment : Fragment() {
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        val view = inflater.inflate(R.layout.fragment_new_post, container, false)
+        // Just inflate the view here. We will do the UI logic in onViewCreated
+        return inflater.inflate(R.layout.fragment_new_post, container, false)
+    }
 
-        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(view) { v, insets ->
-            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            v.setPadding(v.paddingLeft, bars.top, v.paddingRight, v.paddingBottom)
-            androidx.core.view.WindowInsetsCompat.CONSUMED
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        // ---------------------------------------------------------
+        // 1. PADDING FIX (Solves the "Top is eaten up" issue)
+        // ---------------------------------------------------------
+        ViewCompat.setOnApplyWindowInsetsListener(view) { v, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            // This pushes the content down by the exact height of the status bar
+            v.updatePadding(top = insets.top)
+            WindowInsetsCompat.CONSUMED
         }
 
+        // Initialize Views
         postEditText = view.findViewById(R.id.postEditText)
         postButton = view.findViewById(R.id.postButton)
         selectVideoButton = view.findViewById(R.id.selectVideoButton)
@@ -82,11 +97,13 @@ class NewPostFragment : Fragment() {
         imagePreview = view.findViewById(R.id.imagePreview)
         categorySpinner = view.findViewById(R.id.category_spinner)
 
-        val categories = arrayOf("General", "Education", "Sports", "Cafe/Food", "Events", "Memes", "Tech")
+        // Setup Spinner
+        val categories = arrayOf("General", "Education", "Sports", "Cafe-Food", "Events", "Memes", "Tech")
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, categories)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         categorySpinner.adapter = adapter
 
+        // Listeners
         selectVideoButton.setOnClickListener { pickVideoLauncher.launch("video/*") }
         selectImageButton.setOnClickListener { pickImageLauncher.launch("image/*") }
 
@@ -101,14 +118,13 @@ class NewPostFragment : Fragment() {
 
             when {
                 videoUri != null -> uploadVideoToCloudinary(content, selectedCategory)
-                imageUri != null -> uploadImageToCloudinary(content, selectedCategory) // 👈 CHANGED TO CLOUDINARY
+                imageUri != null -> uploadImageToCloudinary(content, selectedCategory)
                 else -> savePostToFirebase(content, selectedCategory, null, null, 0, 0)
             }
         }
-        return view
     }
 
-    // --- 👇 NEW CLOUDINARY IMAGE UPLOAD (REPLACES FIREBASE STORAGE) ---
+    // --- Cloudinary Upload Logic ---
     private fun uploadImageToCloudinary(postText: String, category: String) {
         val progressDialog = ProgressDialog(requireContext()).apply {
             setMessage("Uploading image...")
@@ -117,12 +133,11 @@ class NewPostFragment : Fragment() {
         }
 
         MediaManager.get().upload(imageUri)
-            .option("resource_type", "image") // Explicitly set type to image
+            .option("resource_type", "image")
             .callback(object : UploadCallback {
                 override fun onSuccess(requestId: String, resultData: Map<*, *>?) {
                     progressDialog.dismiss()
                     val imageUrl = resultData?.get("secure_url") as String
-                    // Save to DB with the new Cloudinary URL
                     savePostToFirebase(postText, category, imageUrl, null, mediaWidth, mediaHeight)
                 }
 
@@ -169,9 +184,6 @@ class NewPostFragment : Fragment() {
         userRef.addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val userName = snapshot.child("fullName").getValue(String::class.java) ?: "User"
-                // Get profile pic of the publisher (optional, but good for feed)
-                val userProfilePic = snapshot.child("profileImageUrl").getValue(String::class.java)
-
                 val postsRef = FirebaseDatabase.getInstance().getReference("posts")
                 val postId = postsRef.push().key ?: return
 
@@ -186,35 +198,24 @@ class NewPostFragment : Fragment() {
                     mediaWidth = width,
                     mediaHeight = height,
                     category = category
-                    // If your FeedItem has a publisherImageUrl field, add 'userProfilePic' here
                 )
 
                 postsRef.child(postId).setValue(post).addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         Toast.makeText(requireContext(), "Post published successfully!", Toast.LENGTH_SHORT).show()
-                        postEditText.text.clear()
-                        view?.findViewById<View>(R.id.preview_container)?.visibility = View.GONE
-                        videoPreview.visibility = View.GONE
-                        imagePreview.visibility = View.GONE
-                        videoUri = null
-                        imageUri = null
-                        mediaWidth = 0
-                        mediaHeight = 0
+                        parentFragmentManager.popBackStack() // Go back automatically
                     } else {
                         Toast.makeText(requireContext(), "Failed to publish post.", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
-            override fun onCancelled(error: DatabaseError) {
-                Toast.makeText(requireContext(), "Could not fetch user data.", Toast.LENGTH_SHORT).show()
-            }
+            override fun onCancelled(error: DatabaseError) {}
         })
     }
 
+    // --- Helper Functions ---
     private fun getImageDimensions(uri: Uri) {
-        if (uri == Uri.EMPTY) {
-            mediaWidth = 0; mediaHeight = 0; return
-        }
+        if (uri == Uri.EMPTY) { mediaWidth = 0; mediaHeight = 0; return }
         try {
             val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             requireActivity().contentResolver.openInputStream(uri)?.use {
@@ -222,34 +223,17 @@ class NewPostFragment : Fragment() {
             }
             mediaWidth = options.outWidth
             mediaHeight = options.outHeight
-        } catch (e: Exception) {
-            Log.e("NewPostFragment", "Error getting image dimensions", e)
-        }
+        } catch (e: Exception) { Log.e("NewPostFragment", "Error", e) }
     }
 
     private fun getVideoDimensions(uri: Uri) {
-        if (uri == Uri.EMPTY) {
-            mediaWidth = 0; mediaHeight = 0; return
-        }
+        if (uri == Uri.EMPTY) { mediaWidth = 0; mediaHeight = 0; return }
         try {
             val retriever = MediaMetadataRetriever()
             retriever.setDataSource(requireContext(), uri)
             mediaWidth = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
             mediaHeight = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
             retriever.release()
-        } catch (e: Exception) {
-            Log.e("NewPostFragment", "Error getting video dimensions", e)
-        }
-    }
-
-    // Keep the Nav Bar Hiding Logic
-    override fun onResume() {
-        super.onResume()
-        requireActivity().findViewById<android.view.View>(R.id.bottom_navigation)?.visibility = android.view.View.GONE
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        requireActivity().findViewById<android.view.View>(R.id.bottom_navigation)?.visibility = android.view.View.VISIBLE
+        } catch (e: Exception) { Log.e("NewPostFragment", "Error", e) }
     }
 }

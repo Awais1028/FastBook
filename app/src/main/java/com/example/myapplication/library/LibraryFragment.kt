@@ -12,6 +12,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import com.example.myapplication.R
+import com.example.myapplication.home.FeedActivity
 import com.google.android.material.button.MaterialButton
 
 class LibraryFragment : Fragment() {
@@ -79,5 +80,10 @@ class LibraryFragment : Fragment() {
                 Toast.makeText(context, "No email app found", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        (activity as? FeedActivity)?.updateNavigationUi(showTopBar = true, showBottomBar = true)
     }
 }

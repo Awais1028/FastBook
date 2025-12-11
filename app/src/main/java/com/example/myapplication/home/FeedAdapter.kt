@@ -64,12 +64,11 @@ class FeedAdapter(
         var player: ExoPlayer? = null
         var videoUrl: String? = null
 
-        // 👇 NEW: Watch Timer Logic
+        // 👇 Watch Timer Logic
         private var watchTimerHandler = Handler(Looper.getMainLooper())
         private var watchRunnable: Runnable? = null
         private var hasCountedView = false
 
-        // UPDATED startPlayer: Accepts Category to track score
         fun startPlayer(category: String) {
             releaseAllPlayers()
 
@@ -195,22 +194,22 @@ class FeedAdapter(
             }
         }
 
-        // In your Feed Adapter:
+        // 👇 FIXED: Passing commentCount to CommentFragment
         holder.commentIcon.setOnClickListener {
             val currentPosition = holder.adapterPosition
             if (currentPosition != RecyclerView.NO_POSITION) {
                 val clickedPost = feedList[currentPosition]
 
-                // Ensure that clickedPost.postId is definitely not null here
                 if (clickedPost.postId.isNullOrEmpty()) {
-                    // You may want to add a Toast here: "Error: Cannot open comments for this post."
                     return@setOnClickListener
                 }
 
                 val commentSheet = CommentFragment()
                 val bundle = Bundle()
                 bundle.putString("postId", clickedPost.postId)
-                // ... (other args) ...
+                // 👇 ADDED THIS LINE:
+                bundle.putInt("commentCount", clickedPost.commentCount)
+
                 commentSheet.arguments = bundle
 
                 val activity = holder.itemView.context as AppCompatActivity
@@ -385,7 +384,6 @@ class FeedAdapter(
         }
     }
 
-    // Helper to update scores
     private fun updateUserInterest(userId: String, category: String, points: Int) {
         if (category == "General" || category.isEmpty()) return
 
