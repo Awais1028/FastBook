@@ -22,6 +22,9 @@ import com.example.myapplication.home.PostDetailFragment
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import de.hdodenhof.circleimageview.CircleImageView // Import this if you use CircleImageView in XML
+import android.content.Intent
+import com.example.myapplication.auth.SignInScreen
+import com.example.myapplication.home.FeedActivity
 
 class ProfileFragment : Fragment(R.layout.fragment_profile) {
 
@@ -34,6 +37,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
     private lateinit var fullName: TextView
     private lateinit var editProfileButton: Button
     private lateinit var followButton: Button
+    private lateinit var messageButton: Button // ➕ ADD THIS
     private lateinit var followersCount: TextView
     private lateinit var followingCount: TextView
     private lateinit var followersLayout: LinearLayout
@@ -44,7 +48,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
+        messageButton = view.findViewById(R.id.message_button)
         // Padding Fix (Keep this)
         ViewCompat.setOnApplyWindowInsetsListener(view) { v, windowInsets ->
             val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -53,6 +57,15 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         }
 
         profileUserId = arguments?.getString("uid") ?: currentUserId
+        val logoutBtn = view.findViewById<Button>(R.id.btn_logout)
+
+        logoutBtn.setOnClickListener {
+            FirebaseAuth.getInstance().signOut()
+
+            val intent = Intent(requireContext(), SignInScreen::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+        }
 
         // Initialize Views
         // Ensure your XML ID is actually R.id.profile_image
@@ -99,10 +112,19 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
         if (profileUserId == currentUserId) {
             editProfileButton.visibility = View.VISIBLE
             followButton.visibility = View.GONE
+            messageButton.visibility = View.GONE
+            logoutBtn.visibility = View.VISIBLE
         } else {
             editProfileButton.visibility = View.GONE
             followButton.visibility = View.VISIBLE
+            messageButton.visibility = View.VISIBLE
+            logoutBtn.visibility = View.GONE
             checkFollowStatus()
+        }
+        messageButton.setOnClickListener {
+            val intent = Intent(context, com.example.myapplication.chats.MessageChatActivity::class.java)
+            intent.putExtra("visit_id", profileUserId) // Send the user ID to the chat
+            startActivity(intent)
         }
 
         editProfileButton.setOnClickListener {
@@ -127,16 +149,21 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
     private fun openPostDetail(postId: String?) {
         if (postId == null) return
 
-        val fragment = PostDetailFragment()
-        val args = Bundle()
-        args.putString("postId", postId)
-        fragment.arguments = args
+        val fragment = PostDetailFragment().apply {
+            arguments = Bundle().apply {
+                putString("postId", postId)
+            }
+        }
 
-        parentFragmentManager.beginTransaction()
-            .replace(R.id.container, fragment)
+        val activity = requireActivity() as FeedActivity
+
+        activity.supportFragmentManager.beginTransaction()
+            .hide(activity.supportFragmentManager.fragments.last { it.isVisible })
+            .add(R.id.container, fragment)
             .addToBackStack(null)
             .commit()
     }
+
 
     private fun loadUserInfo() {
         if (profileUserId == null) return

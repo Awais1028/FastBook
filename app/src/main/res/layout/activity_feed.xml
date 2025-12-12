@@ -56,13 +56,6 @@
                     android:textColor="#000000"
                     android:textSize="14sp" />
 
-                <ImageView
-                    android:id="@+id/messageIcon"
-                    android:layout_width="30dp"
-                    android:layout_height="30dp"
-                    android:contentDescription="Messages"
-                    android:padding="3dp"
-                    android:src="@drawable/ic_message" />
             </LinearLayout>
 
         </androidx.appcompat.widget.Toolbar>

@@ -23,6 +23,13 @@ class ChatsAdapter(
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         var showMessage: TextView = itemView.findViewById(R.id.show_message)
         var textSeen: TextView = itemView.findViewById(R.id.text_seen)
+        var textTime: TextView = itemView.findViewById(R.id.text_time)
+
+    }
+    private fun formatTime(timestamp: Long): String {
+        if (timestamp == 0L) return ""
+        val sdf = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
+        return sdf.format(java.util.Date(timestamp))
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -39,6 +46,8 @@ class ChatsAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val chat = mChatList[position]
         holder.showMessage.text = chat.message
+        holder.showMessage.text = chat.message
+        holder.textTime.text = formatTime(chat.timestamp)
         // Logic for "seen" status can be added here
     }
 

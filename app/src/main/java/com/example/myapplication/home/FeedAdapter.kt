@@ -199,23 +199,22 @@ class FeedAdapter(
             val currentPosition = holder.adapterPosition
             if (currentPosition != RecyclerView.NO_POSITION) {
                 val clickedPost = feedList[currentPosition]
-
-                if (clickedPost.postId.isNullOrEmpty()) {
-                    return@setOnClickListener
-                }
+                if (clickedPost.postId.isNullOrEmpty()) return@setOnClickListener
 
                 val commentSheet = CommentFragment()
-                val bundle = Bundle()
-                bundle.putString("postId", clickedPost.postId)
-                // 👇 ADDED THIS LINE:
-                bundle.putInt("commentCount", clickedPost.commentCount)
-
+                val bundle = Bundle().apply {
+                    putString("postId", clickedPost.postId)
+                    putString("postOwnerId", clickedPost.publisher)   // ✅ ADD THIS
+                    putString("category", clickedPost.category)       // ✅ ADD THIS
+                    putInt("commentCount", clickedPost.commentCount)
+                }
                 commentSheet.arguments = bundle
 
                 val activity = holder.itemView.context as AppCompatActivity
                 commentSheet.show(activity.supportFragmentManager, "CommentSheet")
             }
         }
+
 
         holder.likeCountText.text = "${item.likes.size} likes"
         val isLiked = item.likes.containsKey(currentUserId)
@@ -312,11 +311,18 @@ class FeedAdapter(
 
     private fun addNotification(postOwnerId: String, actorId: String, text: String, postId: String) {
         if (postOwnerId == actorId) return
+
         val notifRef = FirebaseDatabase.getInstance().getReference("Notifications").child(postOwnerId)
         val notificationId = notifRef.push().key ?: return
+
         val notification = NotificationItem(notificationId, actorId, text, postId, System.currentTimeMillis())
+
         notifRef.child(notificationId).setValue(notification)
+            .addOnFailureListener { e ->
+                Log.e("NotifDebug", "Failed to write notification: ${e.message}", e)
+            }
     }
+
 
     override fun onViewRecycled(holder: FeedViewHolder) {
         super.onViewRecycled(holder)

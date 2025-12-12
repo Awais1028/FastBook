@@ -82,8 +82,4 @@ class LibraryFragment : Fragment() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        (activity as? FeedActivity)?.updateNavigationUi(showTopBar = true, showBottomBar = true)
-    }
 }

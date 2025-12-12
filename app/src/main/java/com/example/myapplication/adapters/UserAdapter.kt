@@ -9,94 +9,89 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.myapplication.R
-import com.example.myapplication.chats.Chat
-import com.example.myapplication.chats.MessageChatActivity // You will need to create this activity
+import com.example.myapplication.chats.MessageChatActivity
 import com.example.myapplication.users.Users
 import de.hdodenhof.circleimageview.CircleImageView
-import com.google.firebase.database.*
-import com.google.firebase.auth.FirebaseAuth
 
 class UserAdapter(
     private val mContext: Context,
     private val mUsers: List<Users>,
     private val isChatCheck: Boolean,
-    private val lastMessageMap: Map<String, String> = emptyMap()
+    private val lastMessageMap: Map<String, String> = emptyMap(),
+    private val lastTimeMap: Map<String, Long> = emptyMap()
 ) : RecyclerView.Adapter<UserAdapter.ViewHolder>() {
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        var timeText: TextView = itemView.findViewById(R.id.time_text)
-        var unreadBadge: TextView = itemView.findViewById(R.id.unread_badge)
-
-        var usernameText: TextView = itemView.findViewById(R.id.username) // Assumes you have a user_item.xml
+        var usernameText: TextView = itemView.findViewById(R.id.username)
         var profileImageView: CircleImageView = itemView.findViewById(R.id.profile_image)
-        var onlineStatus: CircleImageView = itemView.findViewById(R.id.image_online)
-        var offlineStatus: CircleImageView = itemView.findViewById(R.id.image_offline)
         var lastMessageText: TextView = itemView.findViewById(R.id.message_last)
+
+        // optional views if exist in XML (safe if you remove these from xml)
+        var timeText: TextView? = itemView.findViewById(R.id.time_text)
+        var unreadBadge: TextView? = itemView.findViewById(R.id.unread_badge)
+        var onlineStatus: CircleImageView? = itemView.findViewById(R.id.image_online)
+        var offlineStatus: CircleImageView? = itemView.findViewById(R.id.image_offline)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        // You need a layout file named 'user_search_item_layout.xml' for this to work
         val view = LayoutInflater.from(mContext).inflate(R.layout.user_search_item_layout, parent, false)
         return ViewHolder(view)
     }
 
     override fun getItemCount(): Int = mUsers.size
-    private fun loadLastMessage(otherUserId: String, holder: ViewHolder) {
-        val myId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        val ref = FirebaseDatabase.getInstance().reference.child("Chats")
-
-        ref.orderByChild("timestamp").addListenerForSingleValueEvent(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                var lastMsg: Chat? = null
-
-                for (s in snapshot.children) {
-                    val chat = s.getValue(Chat::class.java) ?: continue
-                    val betweenUs =
-                        (chat.sender == myId && chat.receiver == otherUserId) ||
-                                (chat.sender == otherUserId && chat.receiver == myId)
-
-                    if (betweenUs) lastMsg = chat
-                }
-
-                holder.lastMessageText.text = lastMsg?.message ?: ""
-                holder.lastMessageText.visibility = if (holder.lastMessageText.text.isNullOrBlank()) View.GONE else View.VISIBLE
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        })
-    }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val user = mUsers[position]
-        holder.usernameText.text = user.getFullName()
-        holder.timeText.visibility = View.GONE
-        holder.unreadBadge.visibility = View.GONE
 
-        if (user.getProfileImageUrl().isNotEmpty()) {
-            Glide.with(mContext).load(user.getProfileImageUrl()).into(holder.profileImageView)
+        holder.usernameText.text = user.getFullName()
+
+        val img = user.getProfileImageUrl()
+        if (img.isNotEmpty()) {
+            Glide.with(mContext).load(img).into(holder.profileImageView)
         } else {
             holder.profileImageView.setImageResource(R.drawable.ic_profile)
         }
+
         if (isChatCheck) {
-            val last = lastMessageMap[user.getUID()] ?: ""
-            holder.lastMessageText.text = last
-            holder.lastMessageText.visibility = if (last.isEmpty()) View.GONE else View.VISIBLE
+            // ✅ Last message
+            val lastMsg = lastMessageMap[user.getUID()] ?: ""
+            holder.lastMessageText.text = lastMsg
+            holder.lastMessageText.visibility =
+                if (lastMsg.isBlank()) View.GONE else View.VISIBLE
+
+            // ✅ Last time
+            val ts = lastTimeMap[user.getUID()]
+            if (ts != null) {
+                holder.timeText?.text = formatTime(ts)
+                holder.timeText?.visibility = View.VISIBLE
+            } else {
+                holder.timeText?.visibility = View.GONE
+            }
         } else {
             holder.lastMessageText.visibility = View.GONE
+            holder.timeText?.visibility = View.GONE
         }
 
-
-        // Handle click to open a chat screen
         holder.itemView.setOnClickListener {
             val intent = Intent(mContext, MessageChatActivity::class.java)
             intent.putExtra("visit_id", user.getUID())
             mContext.startActivity(intent)
         }
+    }
+    private fun formatTime(timestamp: Long): String {
+        val now = System.currentTimeMillis()
+        val diff = now - timestamp
 
-        // Logic for online/offline status (can be implemented later)
-        if (isChatCheck) {
-            holder.lastMessageText.visibility = View.VISIBLE
-        } else {
-            holder.lastMessageText.visibility = View.GONE
+        val oneDay = 24 * 60 * 60 * 1000
+
+        val sdfTime = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
+        val sdfDate = java.text.SimpleDateFormat("dd/MM", java.util.Locale.getDefault())
+
+        return when {
+            diff < oneDay -> sdfTime.format(java.util.Date(timestamp))
+            diff < 2 * oneDay -> "Yesterday"
+            else -> sdfDate.format(java.util.Date(timestamp))
         }
     }
+
 }

@@ -149,7 +149,6 @@
         android:layout_margin="16dp"
         android:background="@drawable/bg_grey_box"
         android:padding="8dp"
-        android:src="@drawable/ic_heart"
-        android:rotation="90"
+        android:src="@drawable/ic_arrow_back"
         app:tint="#000000" />
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

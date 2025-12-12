@@ -123,8 +123,5 @@ class FacultyMapFragment : Fragment() {
         val imm = requireContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
         imm.hideSoftInputFromWindow(view?.windowToken, 0)
     }
-    override fun onDestroy() {
-        super.onDestroy()
-        (activity as? FeedActivity)?.updateNavigationUi(showTopBar = true, showBottomBar = true)
-    }
+
 }

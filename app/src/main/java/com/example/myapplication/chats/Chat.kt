@@ -1,4 +1,5 @@
 package com.example.myapplication.chats
+
 data class Chat(
     val sender: String = "",
     val receiver: String = "",

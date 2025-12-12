@@ -108,10 +108,12 @@ class EditProfileFragment : Fragment(R.layout.fragment_edit_profile) {
     // --- ✅ THIS IS THE NEW, RELIABLE CLOUDINARY UPLOAD LOGIC ---
     private fun uploadImageWithCloudinary() {
         MediaManager.get().upload(imageUri)
+            .unsigned("fastians_unsigned")
+            .option("folder", "fastians/profile")
+            .option("resource_type", "image")
             .callback(object : UploadCallback {
                 override fun onSuccess(requestId: String, resultData: Map<*, *>) {
                     val newImageUrl = resultData["secure_url"].toString()
-                    // After getting the URL, update all user info
                     updateUserInfo(newImageUrl)
                 }
 
@@ -124,7 +126,8 @@ class EditProfileFragment : Fragment(R.layout.fragment_edit_profile) {
                 override fun onStart(requestId: String) {}
                 override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) {}
                 override fun onReschedule(requestId: String, error: ErrorInfo) {}
-            }).dispatch()
+            })
+            .dispatch()
     }
 
     private fun updateUserInfo(newImageUrl: String?) {

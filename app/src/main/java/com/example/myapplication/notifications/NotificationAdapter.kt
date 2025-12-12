@@ -54,24 +54,11 @@ class NotificationAdapter(
             }
         holder.itemView.setOnClickListener {
             val currentPosition = holder.adapterPosition
-            if (currentPosition != RecyclerView.NO_POSITION) {
-                val clickedNotification = notifications[currentPosition]
+            if (currentPosition == RecyclerView.NO_POSITION) return@setOnClickListener
 
-                // Create the PostDetailFragment instance
-                val fragment = PostDetailFragment()
-
-                // Create a bundle to pass the postId
-                val args = Bundle()
-                args.putString("postId", clickedNotification.postId)
-                fragment.arguments = args
-
-                // Perform the fragment transaction to open the post
-                val activity = holder.itemView.context as AppCompatActivity
-                activity.supportFragmentManager.beginTransaction()
-                    .replace(R.id.container, fragment)
-                    .addToBackStack(null)
-                    .commit()
-            }
+            val clicked = notifications[currentPosition]
+            val activity = holder.itemView.context as? com.example.myapplication.home.FeedActivity
+            activity?.openPostDetail(clicked.postId)
         }
 
     }

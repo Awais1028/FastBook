@@ -1,9 +1,10 @@
 package com.example.myapplication.chats
 
+// ✅ IMPORTANT: Do NOT create manual getId() etc.
+// Kotlin already creates getters for properties (id, lastMessage, lastTimestamp)
+
 data class ChatList(
-    private var id: String = ""
-) {
-    fun getId(): String {
-        return id
-    }
-}
+    var id: String = "",
+    var lastMessage: String = "",
+    var lastTimestamp: Long = 0L
+)

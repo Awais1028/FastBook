@@ -1,7 +1,10 @@
 package com.example.myapplication.home
 
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.View
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.PopupMenu
@@ -14,7 +17,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.FragmentManager
 import com.example.myapplication.R
 import com.example.myapplication.cafe.CafeFragment
 import com.example.myapplication.chats.ChatsFragment
@@ -23,7 +25,6 @@ import com.example.myapplication.maps.CampusMapFragment
 import com.example.myapplication.notifications.NotificationFragment
 import com.example.myapplication.offices.FacultyMapFragment
 import com.example.myapplication.post.NewPostFragment
-import com.example.myapplication.profile.EditProfileFragment
 import com.example.myapplication.profile.ProfileFragment
 import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.bottomnavigation.BottomNavigationView
@@ -34,10 +35,13 @@ class FeedActivity : AppCompatActivity() {
     private lateinit var topBar: View
     private lateinit var container: FrameLayout
     private lateinit var bottomNav: BottomNavigationView
-    private var feedFragment: Fragment? = null
-    private var profileFragment: Fragment? = null
-    private var notificationFragment: Fragment? = null
-    private var newPostFragment: Fragment? = null
+
+    private var feedFragment: FeedFragment? = null
+    private var profileFragment: ProfileFragment? = null
+    private var notificationFragment: NotificationFragment? = null
+    private var newPostFragment: NewPostFragment? = null
+    private var chatsFragment: ChatsFragment? = null
+
     private var activeFragment: Fragment? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,82 +50,45 @@ class FeedActivity : AppCompatActivity() {
         setContentView(R.layout.activity_feed)
 
         appBarLayout = findViewById(R.id.appBarLayout)
-        val toolbar: Toolbar = findViewById(R.id.toolbar)
         topBar = findViewById(R.id.topBar)
         container = findViewById(R.id.container)
         bottomNav = findViewById(R.id.bottom_navigation)
-        val messageIcon = findViewById<ImageView>(R.id.messageIcon)
+        val toolbar: Toolbar = findViewById(R.id.toolbar)
         val menuIcon = findViewById<ImageView>(R.id.menuIcon)
 
         setSupportActionBar(toolbar)
         supportActionBar?.title = ""
 
-        // 1. FIX TOP: Handle Toolbar Padding
-        ViewCompat.setOnApplyWindowInsetsListener(toolbar) { view, windowInsets ->
-            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.updatePadding(top = insets.top)
+        // Status bar padding
+        ViewCompat.setOnApplyWindowInsetsListener(toolbar) { v, insets ->
+            val sys = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.updatePadding(top = sys.top)
             WindowInsetsCompat.CONSUMED
         }
 
-        // 2. FIX BOTTOM: Handle Container Padding (Dynamic Math)
-        // We wait for the bottomNav to be measured, then apply padding
+        // Bottom padding
         bottomNav.post {
-            ViewCompat.setOnApplyWindowInsetsListener(container) { view, windowInsets ->
-                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-
-                // Calculate total bottom space needed:
-                // System Bar (Black bar) + Bottom Menu Height
-                val bottomPadding = insets.bottom + bottomNav.height
-
-                view.updatePadding(bottom = bottomPadding)
-
-                // Return insets so children (like Maps) can use them if needed
-                windowInsets
+            ViewCompat.setOnApplyWindowInsetsListener(container) { v, insets ->
+                val sys = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                v.updatePadding(bottom = sys.bottom + bottomNav.height)
+                insets
             }
-            // Trigger a pass to apply it immediately
             ViewCompat.requestApplyInsets(container)
         }
-
-        ViewCompat.getWindowInsetsController(window.decorView)?.let { controller ->
-            controller.isAppearanceLightStatusBars = true
-            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
-
         supportFragmentManager.addOnBackStackChangedListener {
-            container.post {
-                updateHeaderVisibility(getVisibleFragment())
-            }
+            val visibleFragment = supportFragmentManager.fragments
+                .lastOrNull { it != null && it.isVisible }
+
+            updateHeaderVisibility(visibleFragment)
         }
 
-
-        messageIcon.setOnClickListener {
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.container, ChatsFragment())
-                .addToBackStack(null)
-                .commit()
+        ViewCompat.getWindowInsetsController(window.decorView)?.let {
+            it.isAppearanceLightStatusBars = true
+            it.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
 
-        menuIcon.setOnClickListener { view ->
-            val popup = PopupMenu(this, view)
-            popup.menuInflater.inflate(R.menu.main_menu, popup.menu)
-            popup.setOnMenuItemClickListener { item ->
-                fun loadMenuFrag(frag: Fragment) {
-                    supportFragmentManager.beginTransaction()
-                        .replace(R.id.container, frag)
-                        .addToBackStack(null)
-                        .commit()
-                }
-                when (item.itemId) {
-                    R.id.action_library -> { loadMenuFrag(LibraryFragment()); true }
-                    R.id.action_cafe -> { loadMenuFrag(CafeFragment()); true }
-                    R.id.action_campus_map -> { loadMenuFrag(CampusMapFragment()); true }
-                    R.id.action_faculty_map -> { loadMenuFrag(FacultyMapFragment()); true }
-                    else -> false
-                }
-            }
-            popup.show()
-        }
-
+        // Default fragment
         if (savedInstanceState == null) {
             feedFragment = FeedFragment()
             supportFragmentManager.beginTransaction()
@@ -131,6 +98,7 @@ class FeedActivity : AppCompatActivity() {
             updateHeaderVisibility(feedFragment)
         }
 
+        // Bottom navigation
         bottomNav.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_home -> {
@@ -138,111 +106,165 @@ class FeedActivity : AppCompatActivity() {
                     switchTab(feedFragment!!)
                     true
                 }
+
                 R.id.nav_profile -> {
                     if (profileFragment == null) profileFragment = ProfileFragment()
                     switchTab(profileFragment!!)
                     true
                 }
+
                 R.id.nav_notifications -> {
                     if (notificationFragment == null) notificationFragment = NotificationFragment()
                     switchTab(notificationFragment!!)
                     true
                 }
+
                 R.id.nav_add -> {
                     if (newPostFragment == null) newPostFragment = NewPostFragment()
                     switchTab(newPostFragment!!)
                     true
                 }
+
+                R.id.nav_chats -> {
+                    if (chatsFragment == null) chatsFragment = ChatsFragment()
+                    switchTab(chatsFragment!!)
+                    true
+                }
+
                 else -> false
             }
         }
-        // In onCreate()
+        supportFragmentManager.addOnBackStackChangedListener {
+            val visible = supportFragmentManager.fragments.lastOrNull { it.isVisible }
+            activeFragment = visible ?: activeFragment
+            updateHeaderVisibility(activeFragment)
+        }
+
+        fun openOverlayFragment(fragment: Fragment) {
+            val tx = supportFragmentManager.beginTransaction()
+            activeFragment?.let { tx.hide(it) }
+            tx.add(R.id.container, fragment)
+                .addToBackStack(null)
+                .commit()
+        }
+
+        // Search (Feed only)
+        val searchEditText = findViewById<EditText>(R.id.searchEditText)
+        searchEditText.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                (activeFragment as? FeedFragment)
+                    ?.onSearchQuery(s?.toString()?.trim().orEmpty())
+            }
+
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
+        // Menu (3-dot)
+        menuIcon.setOnClickListener { anchor ->
+            val popup = PopupMenu(this, anchor)
+            popup.menuInflater.inflate(R.menu.main_menu, popup.menu)
+
+            popup.setOnMenuItemClickListener { item ->
+                val fragment = when (item.itemId) {
+                    R.id.action_library -> LibraryFragment()
+                    R.id.action_cafe -> CafeFragment()
+                    R.id.action_campus_map -> CampusMapFragment()
+                    R.id.action_faculty_map -> FacultyMapFragment()
+                    else -> null
+                } ?: return@setOnMenuItemClickListener false
+
+                // ✅ IMPORTANT: hide whatever is currently visible (your active tab)
+                val current = getVisibleFragment()
+
+                supportFragmentManager.beginTransaction().apply {
+                    if (current != null) hide(current)
+                    add(R.id.container, fragment)
+                    addToBackStack(null)
+                    commit()
+                }
+
+                // ✅ hide top+bottom for menu screens
+                updateHeaderVisibility(fragment)
+
+                true
+            }
+
+            popup.show()
+        }
+
 
     }
+    fun openPostDetail(postId: String) {
+        val fragment = PostDetailFragment().apply {
+            arguments = Bundle().apply { putString("postId", postId) }
+        }
+
+        // IMPORTANT: don't "replace" because it removes your existing tab fragments
+        supportFragmentManager.beginTransaction()
+            .hide(activeFragment ?: return)
+            .add(R.id.container, fragment, "POST_DETAIL")
+            .addToBackStack("POST_DETAIL")
+            .commit()
+
+        // On detail screen: no header/bottom
+        updateHeaderVisibility(fragment)
+    }
+
+    fun openHomeTab() {
+        val bottomNav = findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottom_navigation)
+        bottomNav.selectedItemId = R.id.nav_home
+    }
+
     private fun getVisibleFragment(): Fragment? {
         return supportFragmentManager.fragments.lastOrNull { it != null && it.isVisible }
     }
 
-    private fun switchTab(targetFragment: Fragment) {
-        if (targetFragment == activeFragment) return
+    private fun switchTab(target: Fragment) {
+        if (target == activeFragment) return
 
-        val transaction = supportFragmentManager.beginTransaction()
-        activeFragment?.let { transaction.hide(it) }
+        val tx = supportFragmentManager.beginTransaction()
+        activeFragment?.let { tx.hide(it) }
 
-        if (targetFragment.isAdded) transaction.show(targetFragment)
-        else transaction.add(R.id.container, targetFragment)
+        if (target.isAdded) tx.show(target)
+        else tx.add(R.id.container, target)
 
-        transaction.runOnCommit {
-            activeFragment = targetFragment
-            updateHeaderVisibility(getVisibleFragment())
-        }
-        transaction.commit()
+        tx.commit()
+        activeFragment = target
+        updateHeaderVisibility(target)
     }
 
-
-    // Inside FeedActivity.kt
-
     private fun updateHeaderVisibility(fragment: Fragment?) {
+        if (fragment == null) return   // ✅ CRASH FIX
+
         val params = container.layoutParams as CoordinatorLayout.LayoutParams
 
-        // 1. FEED: Needs BOTH
-        if (fragment is FeedFragment) {
-            // A. Make them Visible FIRST
-            appBarLayout.visibility = View.VISIBLE
-            topBar.visibility = View.VISIBLE
-            bottomNav.visibility = View.VISIBLE
-
-            // B. Re-attach the scrolling behavior
-            params.behavior = AppBarLayout.ScrollingViewBehavior()
-
-            // C. Force Expansion AFTER the view is confirmed visible
-            appBarLayout.post {
-                appBarLayout.setExpanded(true, false)
+        when (fragment) {
+            is FeedFragment -> {
+                appBarLayout.visibility = View.VISIBLE
+                topBar.visibility = View.VISIBLE
+                bottomNav.visibility = View.VISIBLE
+                params.behavior = AppBarLayout.ScrollingViewBehavior()
             }
-        }
-        // 2. BOTTOM ONLY (Profile, NewPost, Notification)
-        else if (fragment is ProfileFragment
-            || fragment is NewPostFragment
-            || fragment is NotificationFragment) {
 
-            appBarLayout.setExpanded(false, false) // Collapse it
-            appBarLayout.visibility = View.GONE
-            topBar.visibility = View.GONE
-            bottomNav.visibility = View.VISIBLE
+            is ProfileFragment,
+            is NewPostFragment,
+            is NotificationFragment,
+            is ChatsFragment -> {
+                appBarLayout.visibility = View.GONE
+                topBar.visibility = View.GONE
+                bottomNav.visibility = View.VISIBLE
+                params.behavior = null
+            }
 
-            params.behavior = null
-        }
-        // 3. NONE (Cafe, Library, Maps, EditProfile)
-        else {
-            appBarLayout.setExpanded(false, false) // Collapse it
-            appBarLayout.visibility = View.GONE
-            topBar.visibility = View.GONE
-            bottomNav.visibility = View.GONE
-
-            params.behavior = null
+            else -> {
+                appBarLayout.visibility = View.GONE
+                topBar.visibility = View.GONE
+                bottomNav.visibility = View.GONE
+                params.behavior = null
+            }
         }
 
         container.requestLayout()
-    }
-    fun updateNavigationUi(showTopBar: Boolean, showBottomBar: Boolean) {
-        // 1. Handle Bottom Navigation
-        val bottomNav = findViewById<View>(R.id.bottom_navigation)
-        if (showBottomBar) {
-            bottomNav.visibility = View.VISIBLE
-        } else {
-            bottomNav.visibility = View.GONE
-        }
-
-        // 2. Handle Top Bar (Toolbar)
-        // If you use setSupportActionBar(toolbar):
-        if (showTopBar) {
-            supportActionBar?.show()
-        } else {
-            supportActionBar?.hide()
-        }
-
-        // NOTE: If you are NOT using supportActionBar but a raw <Toolbar> in XML with an ID:
-        // val toolbar = findViewById<View>(R.id.your_toolbar_id)
-        // toolbar.visibility = if (showTopBar) View.VISIBLE else View.GONE
     }
 }

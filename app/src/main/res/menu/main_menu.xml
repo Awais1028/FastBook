@@ -3,17 +3,6 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        android:id="@+id/home"
-        android:title="Home"
-        android:icon="@drawable/ic_home"
-        app:showAsAction="never"/>
-
-    <item
-        android:id="@+id/extra_features"
-        android:title="Extra Features"
-        android:icon="@drawable/ic_home"
-        app:showAsAction="never"/>
-    <item
         android:id="@+id/action_library"
         android:title="Library"
         app:showAsAction="never" />
@@ -21,12 +10,13 @@
         android:id="@+id/action_cafe"
         android:title="Cafe"
         app:showAsAction="never" />
-    <item
-        android:id="@+id/action_campus_map"
-        android:title="Campus Map"
-        app:showAsAction="never" />
+
     <item
         android:id="@+id/action_faculty_map"
         android:title="Faculty Map"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_campus_map"
+        android:title="Campus Map"
         app:showAsAction="never" />
 </menu>
